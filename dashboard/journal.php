@@ -1743,5 +1743,8 @@ if ($selected_account_id) {
             tradeDateInput.valueAsDate = new Date();
         }
     </script>
+    
+    <!-- AI Chat Widget -->
+    <?php include '../includes/ai-chat-widget.php'; ?>
 </body>
 </html>

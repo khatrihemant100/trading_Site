@@ -1814,6 +1814,9 @@ try {
         });
         
     </script>
+    
+    <!-- AI Chat Widget -->
+    <?php include '../includes/ai-chat-widget.php'; ?>
 </body>
 </html>
 
