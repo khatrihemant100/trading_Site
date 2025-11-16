@@ -19,7 +19,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             $_SESSION['role'] = $user['role'] ?? 'user';
             $_SESSION['profile_image'] = $user['profile_image'] ?? null;
             
-            header("Location: dashboard.php");
+            header("Location: dashboard/dashboard.php");
             exit();
         } else {
             $error = "गलत इमेल वा पासवर्ड!";
@@ -215,7 +215,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                     </li>
                     <?php if (isset($_SESSION['user_id'])): ?>
                     <li class="nav-item">
-                        <a class="nav-link" href="dashboard.php">DASHBOARD</a>
+                        <a class="nav-link" href="dashboard/dashboard.php">DASHBOARD</a>
                     </li>
                     <?php endif; ?>
                 </ul>

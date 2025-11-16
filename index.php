@@ -31,16 +31,96 @@ session_start();
             background-color: var(--dark-card) !important;
             border-bottom: 1px solid var(--border-color);
             box-shadow: 0 2px 10px rgba(0,0,0,0.3);
+            padding: 0.5rem 0;
+            min-height: 60px;
+        }
+        
+        .navbar .container {
+            display: flex;
+            align-items: center;
+            padding-left: 0.5rem;
+            padding-right: 0.5rem;
         }
         
         .navbar-brand {
             color: var(--primary) !important;
+            font-size: 1.4rem;
+            margin-right: 2rem;
+            margin-left: -0.5rem;
+            padding: 0.5rem 0;
+        }
+        
+        .navbar-collapse {
+            flex-grow: 1;
+            display: flex !important;
+            justify-content: space-between;
+            align-items: center;
+            position: relative;
+        }
+        
+        .navbar-nav.mx-auto {
+            position: absolute;
+            left: 50%;
+            transform: translateX(-50%);
+        }
+        
+        .navbar-nav .nav-item {
+            margin: 0 0.4rem;
+        }
+        
+        .navbar-nav .nav-link {
+            padding: 0.5rem 1rem !important;
+            font-size: 0.95rem;
+            font-weight: 500;
+            white-space: nowrap;
+        }
+        
+        .navbar .d-flex.align-items-center {
+            margin-left: auto;
+            margin-right: -0.5rem;
+            padding-left: 1rem;
+        }
+        
+        @media (max-width: 991px) {
+            .navbar .container {
+                padding-left: 0.5rem;
+                padding-right: 0.5rem;
+            }
+            
+            .navbar-brand {
+                margin-right: 1rem;
+                margin-left: 0;
+            }
+            
+            .navbar-nav.mx-auto {
+                position: static;
+                transform: none;
+                margin: 0.75rem 0 !important;
+                width: 100%;
+            }
+            
+            .navbar-nav .nav-item {
+                margin: 0.2rem 0;
+            }
+            
+            .navbar-collapse {
+                flex-direction: column;
+                align-items: flex-start !important;
+            }
+            
+            .navbar .d-flex.align-items-center {
+                margin-left: 0;
+                margin-right: 0;
+                padding-left: 0;
+                width: 100%;
+                justify-content: flex-end;
+                margin-top: 0.75rem;
+            }
         }
         
         .nav-link {
             color: var(--text-secondary) !important;
             transition: all 0.3s;
-            padding: 8px 16px;
             border-radius: 6px;
         }
         
@@ -425,7 +505,7 @@ session_start();
                 <span class="navbar-toggler-icon"></span>
             </button>
             <div class="collapse navbar-collapse" id="navbarNav">
-                <ul class="navbar-nav me-auto">
+                <ul class="navbar-nav mx-auto">
                     <li class="nav-item">
                         <a class="nav-link active" href="index.php">HOME</a>
                     </li>
@@ -443,7 +523,7 @@ session_start();
                     </li>
                     <?php if (isset($_SESSION['user_id'])): ?>
                     <li class="nav-item">
-                        <a class="nav-link" href="dashboard.php">DASHBOARD</a>
+                        <a class="nav-link" href="dashboard/dashboard.php">DASHBOARD</a>
                     </li>
                     <?php endif; ?>
                 </ul>
@@ -468,7 +548,7 @@ session_start();
                                 <span><?php echo htmlspecialchars($_SESSION['username']); ?></span>
                             </button>
                             <ul class="dropdown-menu dropdown-menu-end">
-                                <li><a class="dropdown-item" href="dashboard.php"><i class="fas fa-th-large me-2"></i>Dashboard</a></li>
+                                <li><a class="dropdown-item" href="dashboard/dashboard.php"><i class="fas fa-th-large me-2"></i>Dashboard</a></li>
                                 <li><a class="dropdown-item" href="user/profile.php"><i class="fas fa-user me-2"></i>Profile</a></li>
                                 <li><hr class="dropdown-divider"></li>
                                 <li><a class="dropdown-item text-danger" href="logout.php"><i class="fas fa-sign-out-alt me-2"></i>Logout</a></li>
