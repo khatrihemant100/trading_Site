@@ -1,0 +1,34 @@
+# API Keys and Sensitive Configuration
+config/openai.php
+config/gemini.php
+config/payment.php
+
+# Environment files
+.env
+.env.local
+
+# Uploads
+uploads/trade_screenshots/*
+uploads/profile_images/*
+!uploads/trade_screenshots/.gitkeep
+!uploads/profile_images/.gitkeep
+
+# Logs
+*.log
+error_log
+
+# IDE files
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# Temporary files
+*.tmp
+*.temp
+

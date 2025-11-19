@@ -10,7 +10,7 @@ try {
                           JOIN users ON blogs.author_id = users.id 
                           WHERE slug = ?");
     $stmt->execute([$slug]);
-    $blog = $stmt->fetch();
+    $blog = $stmt->fetch(PDO::FETCH_ASSOC);
 } catch (PDOException $e) {
     die("ब्लग फेच गर्दा त्रुटि: " . $e->getMessage());
 }

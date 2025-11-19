@@ -11,27 +11,27 @@ $stmt = $pdo->prepare("SELECT * FROM users WHERE id = ?");
 $stmt->execute([$_SESSION['user_id']]);
 $user = $stmt->fetch(PDO::FETCH_ASSOC);
 
-$trading_strategies = [
+$community_posts = [
     [
-        'name' => 'Breakout Trading',
-        'description' => 'Trade breakouts from key support/resistance levels',
-        'success_rate' => 65,
-        'risk_level' => 'Medium',
-        'timeframe' => 'Intraday/Swing'
+        'user' => 'John Trader',
+        'time' => '2 hours ago',
+        'content' => 'Just had my first profitable week! Sticking to the 1% risk rule made all the difference.',
+        'likes' => 15,
+        'comments' => 8
     ],
     [
-        'name' => 'Moving Average Crossover',
-        'description' => 'Use MA crossovers to identify trend changes',
-        'success_rate' => 60,
-        'risk_level' => 'Low',
-        'timeframe' => 'Swing/Position'
+        'user' => 'Sarah Investor', 
+        'time' => '5 hours ago',
+        'content' => 'Anyone else struggling with overtrading? How do you control the urge to enter every setup?',
+        'likes' => 23,
+        'comments' => 14
     ],
     [
-        'name' => 'RSI Divergence',
-        'description' => 'Spot hidden divergences for reversal trades',
-        'success_rate' => 70,
-        'risk_level' => 'Medium',
-        'timeframe' => 'Intraday'
+        'user' => 'Mike Analyst',
+        'time' => '1 day ago', 
+        'content' => 'Sharing my NEPSE analysis for this week. Key levels to watch: 2150 support, 2250 resistance.',
+        'likes' => 45,
+        'comments' => 22
     ]
 ];
 ?>
@@ -41,7 +41,7 @@ $trading_strategies = [
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Trading Strategies - NpLTrader</title>
+    <title>Trading Community - NpLTrader</title>
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
     <style>
@@ -533,23 +533,32 @@ $trading_strategies = [
             margin-left: 0 !important;
         }
         
-        .strategy-card {
+        .community-card {
             background: var(--dark-card);
             border-radius: 12px;
-            padding: 25px;
-            margin-bottom: 20px;
+            padding: 20px;
+            margin-bottom: 15px;
             border: 1px solid #334155;
-            transition: all 0.3s ease;
         }
         
-        .strategy-card:hover {
-            border-color: var(--primary);
-            transform: translateY(-3px);
+        .post-card {
+            background: var(--dark-card);
+            border-radius: 12px;
+            padding: 20px;
+            margin-bottom: 15px;
+            border: 1px solid #334155;
         }
         
-        .success-rate {
-            font-size: 2rem;
+        .user-avatar {
+            width: 40px;
+            height: 40px;
+            border-radius: 50%;
+            background: var(--primary);
+            display: flex;
+            align-items: center;
+            justify-content: center;
             font-weight: bold;
+            color: white;
         }
         
         .btn-primary {
@@ -560,6 +569,19 @@ $trading_strategies = [
         .btn-primary:hover {
             background-color: var(--primary-dark);
             border-color: var(--primary-dark);
+        }
+        
+        .form-control {
+            background-color: var(--dark-bg);
+            border: 1px solid var(--border-color);
+            color: var(--text-primary);
+        }
+        
+        .form-control:focus {
+            background-color: var(--dark-bg);
+            border-color: var(--primary);
+            color: var(--text-primary);
+            box-shadow: 0 0 0 0.25rem rgba(16, 185, 129, 0.25);
         }
     </style>
 </head>
@@ -627,90 +649,127 @@ $trading_strategies = [
         <div class="container-fluid py-4">
             <!-- Header -->
             <div class="mb-4">
-                <h1 class="h2">Trading Strategies</h1>
-                <p class="text-muted">Learn and implement proven trading strategies</p>
+                <h1 class="h2">Trading Community</h1>
+                <p class="text-muted">Learn from fellow traders and share experiences</p>
             </div>
 
-            <!-- Strategy Cards -->
             <div class="row">
-                <?php foreach ($trading_strategies as $strategy): ?>
-                    <div class="col-lg-4 col-md-6">
-                        <div class="strategy-card">
-                            <div class="d-flex justify-content-between align-items-start mb-3">
-                                <h5 class="mb-0"><?php echo $strategy['name']; ?></h5>
-                                <span class="badge bg-<?php 
-                                    echo $strategy['risk_level'] === 'Low' ? 'success' : 
-                                         ($strategy['risk_level'] === 'Medium' ? 'warning' : 'danger'); 
-                                ?>">
-                                    <?php echo $strategy['risk_level']; ?> Risk
-                                </span>
+                <!-- Community Feed -->
+                <div class="col-lg-8">
+                    <!-- Create Post -->
+                    <div class="community-card">
+                        <div class="d-flex align-items-center mb-3">
+                            <div class="user-avatar me-3">
+                                <?php echo strtoupper(substr($user['username'], 0, 1)); ?>
+                            </div>
+                            <input type="text" class="form-control" placeholder="Share your trading experience or ask a question...">
+                        </div>
+                        <div class="d-flex justify-content-between">
+                            <button class="btn btn-sm btn-outline-primary">
+                                <i class="fas fa-chart-line me-1"></i>Trade Idea
+                            </button>
+                            <button class="btn btn-sm btn-outline-success">
+                                <i class="fas fa-question me-1"></i>Ask Question
+                            </button>
+                            <button class="btn btn-sm btn-outline-warning">
+                                <i class="fas fa-lightbulb me-1"></i>Share Tip
+                            </button>
+                            <button class="btn btn-primary btn-sm">Post</button>
+                        </div>
+                    </div>
+
+                    <!-- Community Posts -->
+                    <?php foreach ($community_posts as $post): ?>
+                        <div class="post-card">
+                            <div class="d-flex align-items-center mb-3">
+                                <div class="user-avatar me-3">
+                                    <?php echo strtoupper(substr($post['user'], 0, 1)); ?>
+                                </div>
+                                <div>
+                                    <h6 class="mb-0"><?php echo $post['user']; ?></h6>
+                                    <small class="text-muted"><?php echo $post['time']; ?></small>
+                                </div>
                             </div>
                             
-                            <p class="text-muted mb-3"><?php echo $strategy['description']; ?></p>
+                            <p class="mb-3"><?php echo $post['content']; ?></p>
                             
-                            <div class="row text-center">
-                                <div class="col-6">
-                                    <div class="success-rate text-primary">
-                                        <?php echo $strategy['success_rate']; ?>%
-                                    </div>
-                                    <small class="text-muted">Success Rate</small>
+                            <div class="d-flex justify-content-between">
+                                <div>
+                                    <button class="btn btn-sm btn-outline-primary me-2">
+                                        <i class="fas fa-thumbs-up me-1"></i><?php echo $post['likes']; ?>
+                                    </button>
+                                    <button class="btn btn-sm btn-outline-secondary">
+                                        <i class="fas fa-comment me-1"></i><?php echo $post['comments']; ?> Comments
+                                    </button>
                                 </div>
-                                <div class="col-6">
-                                    <div class="success-rate text-info">
-                                        <?php echo $strategy['timeframe']; ?>
-                                    </div>
-                                    <small class="text-muted">Timeframe</small>
-                                </div>
-                            </div>
-                            
-                            <div class="mt-3">
-                                <button class="btn btn-outline-primary btn-sm w-100">
-                                    <i class="fas fa-book me-2"></i>Learn Strategy
+                                <button class="btn btn-sm btn-outline-info">
+                                    <i class="fas fa-share me-1"></i>Share
                                 </button>
                             </div>
                         </div>
-                    </div>
-                <?php endforeach; ?>
-            </div>
+                    <?php endforeach; ?>
+                </div>
 
-            <!-- Strategy Implementation -->
-            <div class="strategy-card mt-4">
-                <h5 class="mb-3">Strategy Performance Tracking</h5>
-                <div class="table-responsive">
-                    <table class="table table-dark table-hover">
-                        <thead>
-                            <tr>
-                                <th>Strategy</th>
-                                <th>Trades</th>
-                                <th>Win Rate</th>
-                                <th>Avg P/L</th>
-                                <th>Status</th>
-                                <th>Action</th>
-                            </tr>
-                        </thead>
-                        <tbody>
-                            <tr>
-                                <td>Breakout Trading</td>
-                                <td>15</td>
-                                <td>67%</td>
-                                <td class="text-success">+रु 1,250</td>
-                                <td><span class="badge bg-success">Active</span></td>
-                                <td>
-                                    <button class="btn btn-sm btn-outline-primary">Analyze</button>
-                                </td>
-                            </tr>
-                            <tr>
-                                <td>MA Crossover</td>
-                                <td>8</td>
-                                <td>50%</td>
-                                <td class="text-danger">-रु 450</td>
-                                <td><span class="badge bg-warning">Testing</span></td>
-                                <td>
-                                    <button class="btn btn-sm btn-outline-primary">Analyze</button>
-                                </td>
-                            </tr>
-                        </tbody>
-                    </table>
+                <!-- Community Stats & Mentors -->
+                <div class="col-lg-4">
+                    <!-- Community Stats -->
+                    <div class="community-card">
+                        <h6 class="mb-3">Community Stats</h6>
+                        <div class="row text-center">
+                            <div class="col-4">
+                                <h5 class="text-primary">1,234</h5>
+                                <small class="text-muted">Traders</small>
+                            </div>
+                            <div class="col-4">
+                                <h5 class="text-success">456</h5>
+                                <small class="text-muted">Active Today</small>
+                            </div>
+                            <div class="col-4">
+                                <h5 class="text-warning">89</h5>
+                                <small class="text-muted">Mentors</small>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Featured Mentors -->
+                    <div class="community-card">
+                        <h6 class="mb-3">Featured Mentors</h6>
+                        <div class="d-flex align-items-center mb-3">
+                            <div class="user-avatar me-3 bg-warning">R</div>
+                            <div>
+                                <h6 class="mb-0">Rajesh Shrestha</h6>
+                                <small class="text-muted">10+ years trading experience</small>
+                            </div>
+                        </div>
+                        <div class="d-flex align-items-center mb-3">
+                            <div class="user-avatar me-3 bg-success">S</div>
+                            <div>
+                                <h6 class="mb-0">Sita Koirala</h6>
+                                <small class="text-muted">NEPSE Specialist</small>
+                            </div>
+                        </div>
+                        <button class="btn btn-outline-primary btn-sm w-100">
+                            Find a Mentor
+                        </button>
+                    </div>
+
+                    <!-- Upcoming Events -->
+                    <div class="community-card">
+                        <h6 class="mb-3">Upcoming Events</h6>
+                        <div class="mb-3">
+                            <small class="text-primary">Tomorrow • 7:00 PM NPT</small>
+                            <h6 class="mb-1">Live Q&A: Risk Management</h6>
+                            <small class="text-muted">With expert trader Anil Gurung</small>
+                        </div>
+                        <div class="mb-3">
+                            <small class="text-success">Friday • 6:00 PM NPT</small>
+                            <h6 class="mb-1">Weekly Market Review</h6>
+                            <small class="text-muted">NEPSE analysis & next week outlook</small>
+                        </div>
+                        <button class="btn btn-outline-success btn-sm w-100">
+                            View All Events
+                        </button>
+                    </div>
                 </div>
             </div>
         </div>

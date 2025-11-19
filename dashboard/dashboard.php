@@ -1165,6 +1165,297 @@ try {
             background-size: 1000px 100%;
             animation: shimmer 2s infinite;
         }
+        
+        /* Live Price Cards */
+        .price-card {
+            background: linear-gradient(135deg, var(--dark-card) 0%, var(--dark-hover) 100%);
+            border: 2px solid var(--border-color);
+            border-radius: 16px;
+            padding: 24px;
+            transition: all 0.4s cubic-bezier(0.4, 0, 0.2, 1);
+            position: relative;
+            overflow: hidden;
+            animation: fadeInUp 0.6s ease-out;
+        }
+        
+        .price-card::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: -100%;
+            width: 100%;
+            height: 100%;
+            background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.05), transparent);
+            transition: left 0.6s;
+        }
+        
+        .price-card:hover::before {
+            left: 100%;
+        }
+        
+        .price-card:hover {
+            transform: translateY(-8px) scale(1.02);
+            box-shadow: 0 16px 40px rgba(0, 0, 0, 0.4);
+        }
+        
+        .gold-card {
+            border-color: #fbbf24;
+        }
+        
+        .gold-card:hover {
+            border-color: #f59e0b;
+            box-shadow: 0 16px 40px rgba(251, 191, 36, 0.3);
+        }
+        
+        .nepse-card {
+            border-color: #3b82f6;
+        }
+        
+        .nepse-card:hover {
+            border-color: #2563eb;
+            box-shadow: 0 16px 40px rgba(59, 130, 246, 0.3);
+        }
+        
+        .btc-card {
+            border-color: #f59e0b;
+        }
+        
+        .btc-card:hover {
+            border-color: #d97706;
+            box-shadow: 0 16px 40px rgba(245, 158, 11, 0.3);
+        }
+        
+        .price-card-header {
+            display: flex;
+            align-items: center;
+            gap: 16px;
+            margin-bottom: 20px;
+        }
+        
+        .price-card-icon {
+            width: 60px;
+            height: 60px;
+            border-radius: 12px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 1.8rem;
+            color: white;
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
+        }
+        
+        .gold-icon {
+            background: linear-gradient(135deg, #fbbf24 0%, #f59e0b 100%);
+        }
+        
+        .nepse-icon {
+            background: linear-gradient(135deg, #3b82f6 0%, #2563eb 100%);
+        }
+        
+        .btc-icon {
+            background: linear-gradient(135deg, #f59e0b 0%, #d97706 100%);
+        }
+        
+        .price-card-title h5 {
+            margin: 0;
+            font-size: 1.1rem;
+            font-weight: 600;
+            color: var(--text-primary);
+        }
+        
+        .price-label {
+            font-size: 0.75rem;
+            color: var(--text-secondary);
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+        
+        .price-value {
+            font-size: 2.2rem;
+            font-weight: 700;
+            color: var(--text-primary);
+            margin-bottom: 12px;
+            min-height: 50px;
+            display: flex;
+            align-items: center;
+        }
+        
+        .price-change {
+            font-size: 0.9rem;
+            font-weight: 600;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+        
+        .price-change.positive {
+            color: var(--primary);
+        }
+        
+        .price-change.negative {
+            color: #ef4444;
+        }
+        
+        .price-update-time {
+            font-size: 0.75rem;
+            color: var(--text-secondary);
+            margin-top: 8px;
+            font-style: italic;
+        }
+        
+        .loading-spinner {
+            color: var(--text-secondary);
+        }
+        
+        /* TradingView Widget Wrapper - Clips bottom copyright area */
+        .tradingview-widget-wrapper {
+            position: relative;
+            height: 180px;
+            overflow: hidden;
+            border-radius: 8px;
+            margin-top: 10px;
+        }
+        
+        /* TradingView Widget Styles */
+        .tradingview-widget-container {
+            border-radius: 8px;
+            background: transparent;
+            position: relative;
+            height: 100%;
+            overflow: hidden;
+            /* Clip bottom 30px where copyright appears */
+            clip-path: inset(0 0 30px 0);
+            -webkit-clip-path: inset(0 0 30px 0);
+        }
+        
+        .tradingview-widget-container__widget {
+            width: 100%;
+            height: 100%;
+        }
+        
+        /* Hide TradingView logo and copyright using wrapper overflow */
+        .tradingview-widget-wrapper iframe {
+            position: relative;
+            /* Move up to hide bottom copyright */
+            margin-bottom: -30px;
+        }
+        
+        /* Additional hiding for any visible elements */
+        .tradingview-widget-wrapper .tradingview-widget-copyright,
+        .tradingview-widget-wrapper a[href*="tradingview.com"],
+        .tradingview-widget-wrapper div[class*="copyright"],
+        .tradingview-widget-wrapper span[class*="trademark"] {
+            display: none !important;
+            visibility: hidden !important;
+            opacity: 0 !important;
+            height: 0 !important;
+            width: 0 !important;
+            overflow: hidden !important;
+            position: absolute !important;
+            bottom: -100px !important;
+        }
+        
+        /* Motivation Card */
+        .motivation-card {
+            background: linear-gradient(135deg, var(--dark-card) 0%, rgba(16, 185, 129, 0.1) 100%);
+            border: 2px solid var(--primary);
+            border-radius: 20px;
+            padding: 32px;
+            position: relative;
+            overflow: hidden;
+            animation: fadeInUp 0.8s ease-out;
+        }
+        
+        .motivation-card::before {
+            content: '';
+            position: absolute;
+            top: -50%;
+            right: -50%;
+            width: 200%;
+            height: 200%;
+            background: radial-gradient(circle, rgba(16, 185, 129, 0.1) 0%, transparent 70%);
+            animation: pulse-glow 4s infinite;
+        }
+        
+        .motivation-header {
+            display: flex;
+            align-items: center;
+            gap: 16px;
+            margin-bottom: 24px;
+            position: relative;
+            z-index: 1;
+        }
+        
+        .motivation-icon {
+            width: 50px;
+            height: 50px;
+            background: linear-gradient(135deg, var(--primary) 0%, var(--primary-dark) 100%);
+            border-radius: 12px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: white;
+            font-size: 1.5rem;
+            box-shadow: 0 4px 12px rgba(16, 185, 129, 0.4);
+        }
+        
+        .motivation-title {
+            flex: 1;
+            margin: 0;
+            font-size: 1.5rem;
+            font-weight: 700;
+            color: var(--text-primary);
+        }
+        
+        .btn-refresh-motivation {
+            width: 45px;
+            height: 45px;
+            border-radius: 12px;
+            background: linear-gradient(135deg, var(--primary) 0%, var(--primary-dark) 100%);
+            border: none;
+            color: white;
+            font-size: 1.2rem;
+            cursor: pointer;
+            transition: all 0.3s;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            box-shadow: 0 4px 12px rgba(16, 185, 129, 0.4);
+        }
+        
+        .btn-refresh-motivation:hover {
+            transform: rotate(180deg) scale(1.1);
+            box-shadow: 0 6px 20px rgba(16, 185, 129, 0.6);
+        }
+        
+        .motivation-content {
+            position: relative;
+            z-index: 1;
+        }
+        
+        .motivation-text {
+            font-size: 1.2rem;
+            line-height: 1.8;
+            color: var(--text-primary);
+            margin: 0;
+            font-style: italic;
+            text-align: center;
+            padding: 20px;
+            background: rgba(0, 0, 0, 0.2);
+            border-radius: 12px;
+            border-left: 4px solid var(--primary);
+            transition: all 0.4s;
+        }
+        
+        .motivation-text.fade-out {
+            opacity: 0;
+            transform: translateY(-10px);
+        }
+        
+        .motivation-text.fade-in {
+            opacity: 1;
+            transform: translateY(0);
+        }
     </style>
 </head>
 <body>
@@ -1201,11 +1492,12 @@ try {
                 <div class="d-flex align-items-center">
                     <?php 
                     $profile_image = $user['profile_image'] ?? null;
+                    $profile_image_path = $profile_image ? __DIR__.'/../' . $profile_image : null;
                     ?>
                     <div class="dropdown me-3">
                         <button class="btn btn-link text-decoration-none dropdown-toggle d-flex align-items-center" type="button" data-bs-toggle="dropdown" style="color: var(--primary) !important; padding: 0;">
-                            <?php if (!empty($profile_image) && file_exists($profile_image)): ?>
-                                <img src="<?php echo htmlspecialchars($profile_image); ?>" alt="Profile" style="width: 32px; height: 32px; border-radius: 50%; object-fit: cover; margin-right: 8px; border: 2px solid var(--primary);">
+                            <?php if (!empty($profile_image) && $profile_image_path && file_exists($profile_image_path)): ?>
+                                <img src="../<?php echo htmlspecialchars($profile_image); ?>" alt="Profile" style="width: 32px; height: 32px; border-radius: 50%; object-fit: cover; margin-right: 8px; border: 2px solid var(--primary);">
                             <?php else: ?>
                                 <div style="width: 32px; height: 32px; border-radius: 50%; background: var(--primary); color: white; display: flex; align-items: center; justify-content: center; margin-right: 8px; font-weight: bold;">
                                     <?php echo strtoupper(substr($user['username'], 0, 1)); ?>
@@ -1290,9 +1582,10 @@ try {
                 <div class="user-avatar">
                     <?php 
                     $profile_image = $user['profile_image'] ?? null;
-                    if (!empty($profile_image) && file_exists($profile_image)): 
+                    $profile_image_path = $profile_image ? __DIR__.'/../' . $profile_image : null;
+                    if (!empty($profile_image) && $profile_image_path && file_exists($profile_image_path)): 
                     ?>
-                        <img src="<?php echo htmlspecialchars($profile_image); ?>" alt="Profile" style="width: 100%; height: 100%; object-fit: cover; border-radius: 50%;">
+                        <img src="../<?php echo htmlspecialchars($profile_image); ?>" alt="Profile" style="width: 100%; height: 100%; object-fit: cover; border-radius: 50%;">
                     <?php else: ?>
                         <?php echo strtoupper(substr($user['username'], 0, 1)); ?>
                     <?php endif; ?>
@@ -1335,279 +1628,153 @@ try {
         <!-- Dashboard Header -->
         <div class="dashboard-header">
             <h1 class="dashboard-title">Welcome back, <?php echo htmlspecialchars($user['username']); ?>! 👋</h1>
-            <p class="dashboard-subtitle">Track your performance and manage your trading journey.</p>
+            <p class="dashboard-subtitle">Track live market prices and stay motivated on your trading journey.</p>
         </div>
 
-        <!-- Summary Cards -->
-        <div class="row g-4 mb-4 stats-grid">
-            <div class="col-md-3 col-sm-6">
-                <div class="summary-card <?php echo ($stats['total_trades'] ?? 0) > 0 ? 'highlight' : ''; ?>">
-                    <div class="summary-card-header">
-                        <div class="summary-card-title">Total Trades</div>
-                        <div class="summary-card-icon">
-                            <i class="fas fa-chart-bar"></i>
-                        </div>
-                    </div>
-                    <div class="summary-card-value"><?php echo $stats['total_trades'] ?? 0; ?></div>
-                    <div class="summary-card-change">
-                        <i class="fas fa-info-circle"></i>
-                        <span>All time trades</span>
-                    </div>
-                </div>
-            </div>
-            
-            <div class="col-md-3 col-sm-6">
-                <div class="summary-card">
-                    <div class="summary-card-header">
-                        <div class="summary-card-title">Win Rate</div>
-                        <div class="summary-card-icon">
-                            <i class="fas fa-trophy"></i>
-                        </div>
-                    </div>
-                    <div class="summary-card-value" style="color: <?php echo $win_rate >= 50 ? 'var(--primary)' : '#ef4444'; ?>">
-                        <?php echo number_format($win_rate, 1); ?>%
-                    </div>
-                    <div class="summary-card-change">
-                        <i class="fas fa-<?php echo $win_rate >= 50 ? 'arrow-up' : 'arrow-down'; ?>"></i>
-                        <span><?php echo $stats['winning_trades'] ?? 0; ?> wins / <?php echo $stats['losing_trades'] ?? 0; ?> losses</span>
-                    </div>
-                </div>
-            </div>
-            
-            <div class="col-md-3 col-sm-6">
-                <div class="summary-card highlight">
-                    <div class="summary-card-header">
-                        <div class="summary-card-title">Total P/L</div>
-                        <div class="summary-card-icon">
-                            <i class="fas fa-wallet"></i>
-                        </div>
-                    </div>
-                    <div class="summary-card-value" style="color: <?php echo ($stats['total_profit_loss'] ?? 0) >= 0 ? 'var(--primary)' : '#ef4444'; ?>">
-                        रु <?php echo number_format($stats['total_profit_loss'] ?? 0, 2); ?>
-                    </div>
-                    <?php if (($stats['total_profit_loss'] ?? 0) > 0): ?>
-                    <div class="summary-card-change">
-                        <i class="fas fa-arrow-up"></i>
-                        <span>Profitable</span>
-                    </div>
-                    <?php elseif (($stats['total_profit_loss'] ?? 0) < 0): ?>
-                    <div class="summary-card-change" style="color: #ef4444;">
-                        <i class="fas fa-arrow-down"></i>
-                        <span>In loss</span>
-                    </div>
-                    <?php endif; ?>
-                </div>
-            </div>
-            
-            <div class="col-md-3 col-sm-6">
-                <div class="summary-card">
-                    <div class="summary-card-header">
-                        <div class="summary-card-title">Open Positions</div>
-                        <div class="summary-card-icon">
-                            <i class="fas fa-book-open"></i>
-                        </div>
-                    </div>
-                    <div class="summary-card-value"><?php echo $open_positions; ?></div>
-                    <div class="summary-card-change">
-                        <i class="fas fa-clock"></i>
-                        <span>Active trades</span>
-                    </div>
-                </div>
-            </div>
-        </div>
-        
-        <!-- Additional Trader Stats -->
+        <!-- Live Market Prices -->
         <div class="row g-4 mb-4">
-            <div class="col-md-3 col-sm-6">
-                <div class="summary-card">
-                    <div class="summary-card-header">
-                        <div class="summary-card-title">Best Trade</div>
-                        <div class="summary-card-icon">
-                            <i class="fas fa-star"></i>
+            <div class="col-md-4 col-sm-6">
+                <div class="price-card gold-card">
+                    <div class="price-card-header">
+                        <div class="price-card-icon gold-icon">
+                            <i class="fas fa-coins"></i>
+                        </div>
+                        <div class="price-card-title">
+                            <h5>Gold (XAU/USD)</h5>
+                            <span class="price-label">Live Spot Price</span>
                         </div>
                     </div>
-                    <div class="summary-card-value" style="color: var(--primary);">
-                        रु <?php echo number_format($stats['best_trade'] ?? 0, 2); ?>
-                    </div>
-                    <div class="summary-card-change">
-                        <i class="fas fa-thumbs-up"></i>
-                        <span>Highest profit</span>
+                    <div class="tradingview-widget-wrapper">
+                        <div class="tradingview-widget-container" style="height: 180px;">
+                            <div class="tradingview-widget-container__widget"></div>
+                            <script type="text/javascript" src="https://s3.tradingview.com/external-embedding/embed-widget-mini-symbol-overview.js" async>
+                            {
+                            "symbol": "OANDA:XAUUSD",
+                            "chartOnly": false,
+                            "dateRange": "1D",
+                            "trendLineColor": "rgba(255, 152, 0, 1)",
+                            "noTimeScale": false,
+                            "colorTheme": "dark",
+                            "isTransparent": true,
+                            "locale": "en",
+                            "width": "100%",
+                            "autosize": true,
+                            "height": "100%"
+                            }
+                            </script>
+                        </div>
                     </div>
                 </div>
             </div>
             
-            <div class="col-md-3 col-sm-6">
-                <div class="summary-card">
-                    <div class="summary-card-header">
-                        <div class="summary-card-title">Worst Trade</div>
-                        <div class="summary-card-icon">
-                            <i class="fas fa-exclamation-triangle"></i>
+            <div class="col-md-4 col-sm-6">
+                <div class="price-card nepse-card">
+                    <div class="price-card-header">
+                        <div class="price-card-icon nepse-icon">
+                            <i class="fas fa-chart-line"></i>
+                        </div>
+                        <div class="price-card-title">
+                            <h5>NEPSE Index</h5>
+                            <span class="price-label">Nepal Stock Exchange</span>
                         </div>
                     </div>
-                    <div class="summary-card-value" style="color: #ef4444;">
-                        रु <?php echo number_format($stats['worst_trade'] ?? 0, 2); ?>
+                    <div class="price-value" id="nepsePrice">
+                        <span class="loading-spinner"><i class="fas fa-spinner fa-spin"></i> Loading...</span>
                     </div>
-                    <div class="summary-card-change" style="color: #ef4444;">
-                        <i class="fas fa-thumbs-down"></i>
-                        <span>Biggest loss</span>
+                    <div class="price-change" id="nepseChange">
+                        <span class="loading-spinner"><i class="fas fa-spinner fa-spin"></i></span>
+                    </div>
+                    <div class="price-update-time" id="nepseUpdateTime"></div>
+                    <div style="margin-top: 8px;">
+                        <a href="https://nepsealpha.com/live-market" target="_blank" style="color: var(--text-secondary); font-size: 0.75rem; text-decoration: none;">
+                            <i class="fas fa-external-link-alt"></i> View Live Market
+                        </a>
                     </div>
                 </div>
             </div>
             
-            <div class="col-md-3 col-sm-6">
-                <div class="summary-card">
-                    <div class="summary-card-header">
-                        <div class="summary-card-title">Avg P/L</div>
-                        <div class="summary-card-icon">
-                            <i class="fas fa-calculator"></i>
+            <div class="col-md-4 col-sm-6">
+                <div class="price-card btc-card">
+                    <div class="price-card-header">
+                        <div class="price-card-icon btc-icon">
+                            <i class="fab fa-bitcoin"></i>
+                        </div>
+                        <div class="price-card-title">
+                            <h5>Bitcoin (BTC)</h5>
+                            <span class="price-label">Cryptocurrency</span>
                         </div>
                     </div>
-                    <div class="summary-card-value" style="color: <?php echo ($stats['avg_profit_loss'] ?? 0) >= 0 ? 'var(--primary)' : '#ef4444'; ?>">
-                        रु <?php echo number_format($stats['avg_profit_loss'] ?? 0, 2); ?>
-                    </div>
-                    <div class="summary-card-change">
-                        <i class="fas fa-chart-line"></i>
-                        <span>Per trade average</span>
-                    </div>
-                </div>
-            </div>
-            
-            <div class="col-md-3 col-sm-6">
-                <div class="summary-card">
-                    <div class="summary-card-header">
-                        <div class="summary-card-title">Journal Entries</div>
-                        <div class="summary-card-icon">
-                            <i class="fas fa-book"></i>
+                    <div class="tradingview-widget-wrapper">
+                        <div class="tradingview-widget-container" style="height: 180px;">
+                            <div class="tradingview-widget-container__widget"></div>
+                            <script type="text/javascript" src="https://s3.tradingview.com/external-embedding/embed-widget-mini-symbol-overview.js" async>
+                            {
+                            "symbol": "BINANCE:BTCUSDT",
+                            "chartOnly": false,
+                            "dateRange": "1D",
+                            "trendLineColor": "rgba(255, 152, 0, 1)",
+                            "noTimeScale": false,
+                            "colorTheme": "dark",
+                            "isTransparent": true,
+                            "locale": "en",
+                            "width": "100%",
+                            "autosize": true,
+                            "height": "100%"
+                            }
+                            </script>
                         </div>
-                    </div>
-                    <div class="summary-card-value"><?php echo count($journal_entries); ?></div>
-                    <div class="summary-card-change">
-                        <i class="fas fa-list"></i>
-                        <span>Recent entries</span>
                     </div>
                 </div>
             </div>
         </div>
-        
-        <!-- Trader Features Section -->
+
+        <!-- Motivation Section -->
         <div class="row g-4 mb-4">
             <div class="col-12">
-                <h3 class="content-card-title mb-4">
-                    <i class="fas fa-rocket me-2"></i>Trader Essentials
-                </h3>
-            </div>
-            <div class="col-lg-3 col-md-6">
-                <a href="journal.php" class="trader-feature-card">
-                    <div class="trader-feature-icon">
-                        <i class="fas fa-book-open"></i>
-                    </div>
-                    <div class="trader-feature-title">Trading Journal</div>
-                    <div class="trader-feature-desc">
-                        Track every trade, analyze patterns, and improve your strategy with detailed journal entries.
-                    </div>
-                </a>
-            </div>
-            <div class="col-lg-3 col-md-6">
-                <a href="Community.php" class="trader-feature-card">
-                    <div class="trader-feature-icon">
-                        <i class="fas fa-users"></i>
-                    </div>
-                    <div class="trader-feature-title">Community</div>
-                    <div class="trader-feature-desc">
-                        Connect with fellow traders, share insights, learn strategies, and grow together in our active community.
-                    </div>
-                </a>
-            </div>
-            <div class="col-lg-3 col-md-6">
-                <a href="portfolio.php" class="trader-feature-card">
-                    <div class="trader-feature-icon">
-                        <i class="fas fa-chart-pie"></i>
-                    </div>
-                    <div class="trader-feature-title">Portfolio</div>
-                    <div class="trader-feature-desc">
-                        Monitor your portfolio performance, view detailed analytics, and track your trading progress.
-                    </div>
-                </a>
-            </div>
-            <div class="col-lg-3 col-md-6">
-                <a href="Mindset.php" class="trader-feature-card">
-                    <div class="trader-feature-icon">
-                        <i class="fas fa-brain"></i>
-                    </div>
-                    <div class="trader-feature-title">Mindset & Psychology</div>
-                    <div class="trader-feature-desc">
-                        Master your trading psychology, control emotions, and develop the right mindset for consistent success.
-                    </div>
-                </a>
-            </div>
-        </div>
-
-        <!-- Bottom Section -->
-        <div class="row g-4">
-            <!-- Recent Activity -->
-            <div class="col-lg-8">
-                <div class="content-card">
-                    <h3 class="content-card-title">Recent Activity</h3>
-                    
-                    <?php if (empty($journal_entries)): ?>
-                        <div class="empty-state">
-                            <div class="empty-state-icon">
-                                <i class="fas fa-inbox"></i>
-                            </div>
-                            <p class="empty-state-text">Start adding trades to see your activity here.</p>
+                <div class="motivation-card">
+                    <div class="motivation-header">
+                        <div class="motivation-icon">
+                            <i class="fas fa-quote-left"></i>
                         </div>
-                    <?php else: ?>
-                        <div>
-                            <?php foreach (array_slice($journal_entries, 0, 5) as $entry): ?>
-                                <div class="activity-item">
-                                    <div class="activity-info">
-                                        <div class="activity-symbol">
-                                            <?php echo htmlspecialchars($entry['symbol']); ?> - 
-                                            <?php echo $entry['trade_type'] === 'buy' ? 'Buy' : 'Sell'; ?>
-                                        </div>
-                                        <div class="activity-details">
-                                            <?php echo date('M d, Y', strtotime($entry['trade_date'])); ?> • 
-                                            Qty: <?php echo number_format($entry['quantity'], 2); ?> • 
-                                            Entry: रु <?php echo number_format($entry['entry_price'], 2); ?>
-                                            <?php if ($entry['exit_price']): ?>
-                                                • Exit: रु <?php echo number_format($entry['exit_price'], 2); ?>
-                                            <?php endif; ?>
-                                        </div>
-                                    </div>
-                                    <?php if ($entry['profit_loss'] !== null): ?>
-                                        <div class="activity-pnl <?php echo $entry['profit_loss'] >= 0 ? 'positive' : 'negative'; ?>">
-                                            <?php echo $entry['profit_loss'] >= 0 ? '+' : ''; ?>रु <?php echo number_format($entry['profit_loss'], 2); ?>
-                                        </div>
-                                    <?php else: ?>
-                                        <div class="activity-pnl" style="color: var(--text-secondary);">
-                                            Open
-                                        </div>
-                                    <?php endif; ?>
-                                </div>
-                            <?php endforeach; ?>
-                        </div>
-                    <?php endif; ?>
-                </div>
-            </div>
-
-            <!-- Quick Actions -->
-            <div class="col-lg-4">
-                <div class="content-card">
-                    <h3 class="content-card-title">Quick Actions</h3>
-                    
-                    <a href="journal.php" class="quick-action-btn">
-                        <div class="quick-action-btn-title">
-                            <i class="fas fa-plus-circle me-2"></i>Add Journal Entry
-                        </div>
-                        <div class="quick-action-btn-desc">Record your trading thoughts and analysis.</div>
-                    </a>
-                    
-                    <a href="journal.php" class="quick-action-btn">
-                        <div class="quick-action-btn-title">
-                            <i class="fas fa-chart-line me-2"></i>Log New Trade
-                        </div>
-                        <div class="quick-action-btn-desc">Add a new trade to your portfolio.</div>
-                    </a>
+                        <h4 class="motivation-title">Daily Trading Motivation</h4>
+                        <button class="btn-refresh-motivation" onclick="changeMotivation()" title="Get New Motivation">
+                            <i class="fas fa-sync-alt"></i>
+                        </button>
+                    </div>
+                    <div class="motivation-content">
+                        <p class="motivation-text" id="motivationText">
+                            <?php
+                            $motivations = [
+                                "The stock market is filled with individuals who know the price of everything, but the value of nothing. - Philip Fisher",
+                                "The goal of a successful trader is to make the best trades. Money is secondary. - Alexander Elder",
+                                "In trading, just like in life, you have to work with probabilities, not certainties. - Unknown",
+                                "The most important quality for an investor is temperament, not intellect. - Warren Buffett",
+                                "Risk comes from not knowing what you're doing. - Warren Buffett",
+                                "The market can remain irrational longer than you can remain solvent. - John Maynard Keynes",
+                                "Trading is 80% psychology and 20% method. Master your mind, master the markets.",
+                                "The best time to plant a tree was 20 years ago. The second best time is now. Start your trading journey today.",
+                                "Success in trading is not about being right all the time, it's about managing risk and staying disciplined.",
+                                "The difference between successful traders and others is not the absence of fear, but the mastery of it.",
+                                "Every expert was once a beginner. Every pro was once an amateur. Keep learning, keep growing.",
+                                "The market is a voting machine in the short run, but a weighing machine in the long run. - Benjamin Graham",
+                                "Patience is not the ability to wait, but the ability to keep a good attitude while waiting. - Unknown",
+                                "The biggest risk is not taking any risk. In a world that's changing quickly, the only strategy that is guaranteed to fail is not taking risks. - Mark Zuckerberg",
+                                "Your trading plan is your roadmap to success. Follow it religiously, adjust it wisely.",
+                                "Losses are tuition fees in the school of trading. Learn from them, don't fear them.",
+                                "The best traders are not the ones who make the most money, but the ones who lose the least when they're wrong.",
+                                "Consistency beats intensity. Small, consistent gains compound into significant wealth over time.",
+                                "Emotion is the enemy of the trader. Discipline is your best friend.",
+                                "The market doesn't care about your feelings. Trade the charts, not your emotions.",
+                                "Price is what you pay. Value is what you get. - Warren Buffett",
+                                "The four most dangerous words in investing are: 'This time it's different.' - Sir John Templeton",
+                                "In the short run, the market is a voting machine, but in the long run, it is a weighing machine. - Benjamin Graham",
+                                "Rule No. 1: Never lose money. Rule No. 2: Never forget rule No. 1. - Warren Buffett",
+                                "The stock market is a device for transferring money from the impatient to the patient. - Warren Buffett"
+                            ];
+                            echo $motivations[array_rand($motivations)];
+                            ?>
+                        </p>
+                    </div>
                 </div>
             </div>
         </div>
@@ -1805,13 +1972,135 @@ try {
             }, observerOptions);
             
             // Observe all cards
-            document.querySelectorAll('.summary-card, .content-card, .trader-feature-card').forEach(card => {
+            document.querySelectorAll('.price-card, .motivation-card').forEach(card => {
                 card.style.opacity = '0';
                 card.style.transform = 'translateY(20px)';
                 card.style.transition = 'opacity 0.6s ease-out, transform 0.6s ease-out';
                 observer.observe(card);
             });
+            
+            // Load NEPSE price (Gold and Bitcoin use TradingView widgets)
+            loadNEPSEPrice();
+            // Update NEPSE price every 30 seconds
+            setInterval(loadNEPSEPrice, 30000);
+            
+            // Hide TradingView copyright/logo after widgets load
+            setTimeout(() => {
+                const widgets = document.querySelectorAll('.tradingview-widget-container');
+                widgets.forEach(widget => {
+                    // Hide copyright links
+                    const links = widget.querySelectorAll('a[href*="tradingview.com"]');
+                    links.forEach(link => {
+                        link.style.display = 'none';
+                        link.parentElement && (link.parentElement.style.display = 'none');
+                    });
+                    
+                    // Hide copyright text
+                    const copyright = widget.querySelector('.tradingview-widget-copyright');
+                    if (copyright) {
+                        copyright.style.display = 'none';
+                    }
+                    
+                    // Hide any text containing "TradingView"
+                    const allElements = widget.querySelectorAll('*');
+                    allElements.forEach(el => {
+                        if (el.textContent && el.textContent.includes('TradingView') && el.tagName !== 'SCRIPT') {
+                            el.style.display = 'none';
+                        }
+                    });
+                });
+            }, 2000);
+            
+            // Also hide on iframe load using MutationObserver
+            const tvObserver = new MutationObserver(() => {
+                document.querySelectorAll('.tradingview-widget-container a[href*="tradingview.com"]').forEach(el => {
+                    el.style.display = 'none';
+                    el.parentElement && (el.parentElement.style.display = 'none');
+                });
+                document.querySelectorAll('.tradingview-widget-copyright').forEach(el => {
+                    el.style.display = 'none';
+                });
+            });
+            
+            document.querySelectorAll('.tradingview-widget-container').forEach(container => {
+                tvObserver.observe(container, { childList: true, subtree: true });
+            });
         });
+        
+        // Load NEPSE Index Price
+        function loadNEPSEPrice() {
+            // NEPSE Index - Fetching from our backend API
+            fetch('../api/nepse.php')
+                .then(response => response.json())
+                .then(data => {
+                    if (data && data.success) {
+                        const value = parseFloat(data.index).toFixed(2);
+                        const change = parseFloat(data.change || 0).toFixed(2);
+                        const changePercent = parseFloat(data.changePercent || 0).toFixed(2);
+                        const isPositive = change >= 0;
+                        
+                        document.getElementById('nepsePrice').innerHTML = value;
+                        document.getElementById('nepseChange').innerHTML = `
+                            <i class="fas fa-arrow-${isPositive ? 'up' : 'down'}"></i>
+                            <span class="${isPositive ? 'positive' : 'negative'}">${isPositive ? '+' : ''}${change} (${isPositive ? '+' : ''}${changePercent}%)</span>
+                        `;
+                        document.getElementById('nepseUpdateTime').textContent = 'Updated: ' + new Date().toLocaleTimeString();
+                    } else {
+                        throw new Error('NEPSE data not available');
+                    }
+                })
+                .catch(() => {
+                    // Fallback: Show link to nepsealpha.com
+                    document.getElementById('nepsePrice').innerHTML = '<a href="https://nepsealpha.com/live-market" target="_blank" style="color: var(--primary); text-decoration: none;">View Live Market →</a>';
+                    document.getElementById('nepseChange').innerHTML = '<span style="color: var(--text-secondary);">Click to view</span>';
+                    document.getElementById('nepseUpdateTime').textContent = 'Visit nepsealpha.com for live data';
+                });
+        }
+        
+        // Change Motivation Function
+        function changeMotivation() {
+            const motivations = [
+                "The stock market is filled with individuals who know the price of everything, but the value of nothing. - Philip Fisher",
+                "The goal of a successful trader is to make the best trades. Money is secondary. - Alexander Elder",
+                "In trading, just like in life, you have to work with probabilities, not certainties. - Unknown",
+                "The most important quality for an investor is temperament, not intellect. - Warren Buffett",
+                "Risk comes from not knowing what you're doing. - Warren Buffett",
+                "The market can remain irrational longer than you can remain solvent. - John Maynard Keynes",
+                "Trading is 80% psychology and 20% method. Master your mind, master the markets.",
+                "The best time to plant a tree was 20 years ago. The second best time is now. Start your trading journey today.",
+                "Success in trading is not about being right all the time, it's about managing risk and staying disciplined.",
+                "The difference between successful traders and others is not the absence of fear, but the mastery of it.",
+                "Every expert was once a beginner. Every pro was once an amateur. Keep learning, keep growing.",
+                "The market is a voting machine in the short run, but a weighing machine in the long run. - Benjamin Graham",
+                "Patience is not the ability to wait, but the ability to keep a good attitude while waiting. - Unknown",
+                "The biggest risk is not taking any risk. In a world that's changing quickly, the only strategy that is guaranteed to fail is not taking risks. - Mark Zuckerberg",
+                "Your trading plan is your roadmap to success. Follow it religiously, adjust it wisely.",
+                "Losses are tuition fees in the school of trading. Learn from them, don't fear them.",
+                "The best traders are not the ones who make the most money, but the ones who lose the least when they're wrong.",
+                "Consistency beats intensity. Small, consistent gains compound into significant wealth over time.",
+                "Emotion is the enemy of the trader. Discipline is your best friend.",
+                "The market doesn't care about your feelings. Trade the charts, not your emotions.",
+                "Price is what you pay. Value is what you get. - Warren Buffett",
+                "The four most dangerous words in investing are: 'This time it's different.' - Sir John Templeton",
+                "In the short run, the market is a voting machine, but in the long run, it is a weighing machine. - Benjamin Graham",
+                "Rule No. 1: Never lose money. Rule No. 2: Never forget rule No. 1. - Warren Buffett",
+                "The stock market is a device for transferring money from the impatient to the patient. - Warren Buffett"
+            ];
+            
+            const motivationText = document.getElementById('motivationText');
+            motivationText.classList.add('fade-out');
+            
+            setTimeout(() => {
+                const randomMotivation = motivations[Math.floor(Math.random() * motivations.length)];
+                motivationText.textContent = randomMotivation;
+                motivationText.classList.remove('fade-out');
+                motivationText.classList.add('fade-in');
+                
+                setTimeout(() => {
+                    motivationText.classList.remove('fade-in');
+                }, 400);
+            }, 300);
+        }
         
     </script>
     

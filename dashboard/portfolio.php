@@ -1,5 +1,6 @@
 <?php
 session_start();
+
 if (!isset($_SESSION['user_id'])) {
     header("Location: ../login.php");
     exit();
@@ -7,43 +8,257 @@ if (!isset($_SESSION['user_id'])) {
 
 require_once __DIR__.'/../config/database.php';
 
+// Fetch user data
 $stmt = $pdo->prepare("SELECT * FROM users WHERE id = ?");
 $stmt->execute([$_SESSION['user_id']]);
 $user = $stmt->fetch(PDO::FETCH_ASSOC);
 
-$community_posts = [
-    [
-        'user' => 'John Trader',
-        'time' => '2 hours ago',
-        'content' => 'Just had my first profitable week! Sticking to the 1% risk rule made all the difference.',
-        'likes' => 15,
-        'comments' => 8
-    ],
-    [
-        'user' => 'Sarah Investor', 
-        'time' => '5 hours ago',
-        'content' => 'Anyone else struggling with overtrading? How do you control the urge to enter every setup?',
-        'likes' => 23,
-        'comments' => 14
-    ],
-    [
-        'user' => 'Mike Analyst',
-        'time' => '1 day ago', 
-        'content' => 'Sharing my NEPSE analysis for this week. Key levels to watch: 2150 support, 2250 resistance.',
-        'likes' => 45,
-        'comments' => 22
-    ]
-];
-?>
+if (!$user) {
+    header("Location: ../logout.php");
+    exit();
+}
 
+// Get all accounts statistics
+try {
+    // Total accounts created
+    $total_accounts_stmt = $pdo->prepare("SELECT COUNT(*) as total FROM trading_accounts WHERE user_id = ?");
+    $total_accounts_stmt->execute([$_SESSION['user_id']]);
+    $total_accounts = $total_accounts_stmt->fetch(PDO::FETCH_ASSOC)['total'];
+    
+    // Total money invested (ONLY challenge_fee for prop firms, initial_balance for others)
+    // Check if challenge_fee column exists
+    $columns_check = $pdo->query("SHOW COLUMNS FROM trading_accounts LIKE 'challenge_fee'")->fetch();
+    if ($columns_check) {
+        // For prop firms: only challenge_fee is investment
+        // For other accounts: initial_balance is investment
+        $total_invested_stmt = $pdo->prepare("
+            SELECT SUM(
+                CASE 
+                    WHEN account_type = 'propfirm' THEN COALESCE(challenge_fee, 0)
+                    ELSE initial_balance
+                END
+            ) as total 
+            FROM trading_accounts 
+            WHERE user_id = ?
+        ");
+    } else {
+        $total_invested_stmt = $pdo->prepare("SELECT SUM(initial_balance) as total FROM trading_accounts WHERE user_id = ?");
+    }
+    $total_invested_stmt->execute([$_SESSION['user_id']]);
+    $total_invested = $total_invested_stmt->fetch(PDO::FETCH_ASSOC)['total'] ?? 0;
+    
+    // Total challenge fees paid (for prop firms only)
+    if ($columns_check) {
+        $challenge_fees_stmt = $pdo->prepare("SELECT SUM(COALESCE(challenge_fee, 0)) as total FROM trading_accounts WHERE user_id = ? AND account_type = 'propfirm'");
+        $challenge_fees_stmt->execute([$_SESSION['user_id']]);
+        $total_challenge_fees = $challenge_fees_stmt->fetch(PDO::FETCH_ASSOC)['total'] ?? 0;
+    } else {
+        $total_challenge_fees = 0;
+    }
+    
+    // Active accounts (active + ongoing)
+    $active_accounts_stmt = $pdo->prepare("SELECT COUNT(*) as total FROM trading_accounts WHERE user_id = ? AND status IN ('active', 'ongoing')");
+    $active_accounts_stmt->execute([$_SESSION['user_id']]);
+    $active_accounts = $active_accounts_stmt->fetch(PDO::FETCH_ASSOC)['total'];
+    
+    // Failed/Closed accounts (breach, closed, inactive)
+    $failed_accounts_stmt = $pdo->prepare("SELECT COUNT(*) as total FROM trading_accounts WHERE user_id = ? AND status IN ('closed', 'inactive', 'breach')");
+    $failed_accounts_stmt->execute([$_SESSION['user_id']]);
+    $failed_accounts = $failed_accounts_stmt->fetch(PDO::FETCH_ASSOC)['total'];
+    
+    // Total withdrawals from account_withdrawals table
+    // Create table if it doesn't exist
+    try {
+        $pdo->exec("
+            CREATE TABLE IF NOT EXISTS account_withdrawals (
+                id INT AUTO_INCREMENT PRIMARY KEY,
+                user_id INT NOT NULL,
+                account_id INT NULL,
+                withdrawal_amount DECIMAL(15,2) NOT NULL,
+                currency VARCHAR(10) DEFAULT 'USD',
+                platform ENUM('rise','bank','crypto','other') NOT NULL,
+                platform_details VARCHAR(255) DEFAULT NULL,
+                withdrawal_date DATE NOT NULL,
+                notes TEXT DEFAULT NULL,
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+                FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE,
+                FOREIGN KEY (account_id) REFERENCES trading_accounts(id) ON DELETE SET NULL
+            ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+        ");
+    } catch (PDOException $e) {
+        // Table might already exist, continue
+    }
+    
+    $withdrawals_stmt = $pdo->prepare("
+        SELECT COALESCE(SUM(withdrawal_amount), 0) as total 
+        FROM account_withdrawals 
+        WHERE user_id = ?
+    ");
+    $withdrawals_stmt->execute([$_SESSION['user_id']]);
+    $total_withdrawals = $withdrawals_stmt->fetch(PDO::FETCH_ASSOC)['total'] ?? 0;
+    
+    // Withdrawals breakdown by platform
+    $withdrawals_by_platform_stmt = $pdo->prepare("
+        SELECT 
+            platform,
+            COUNT(*) as count,
+            COALESCE(SUM(withdrawal_amount), 0) as total_amount
+        FROM account_withdrawals
+        WHERE user_id = ?
+        GROUP BY platform
+        ORDER BY total_amount DESC
+    ");
+    $withdrawals_by_platform_stmt->execute([$_SESSION['user_id']]);
+    $withdrawals_by_platform = $withdrawals_by_platform_stmt->fetchAll(PDO::FETCH_ASSOC);
+    
+    // Lifetime profit/loss (from all trades)
+    $lifetime_pl_stmt = $pdo->prepare("
+        SELECT COALESCE(SUM(profit_loss), 0) as total 
+        FROM trading_journal 
+        WHERE user_id = ? AND profit_loss IS NOT NULL
+    ");
+    $lifetime_pl_stmt->execute([$_SESSION['user_id']]);
+    $lifetime_pl = $lifetime_pl_stmt->fetch(PDO::FETCH_ASSOC)['total'] ?? 0;
+    
+    // Total loss (only negative values)
+    $total_loss_stmt = $pdo->prepare("
+        SELECT COALESCE(SUM(profit_loss), 0) as total 
+        FROM trading_journal 
+        WHERE user_id = ? AND profit_loss < 0
+    ");
+    $total_loss_stmt->execute([$_SESSION['user_id']]);
+    $total_loss = abs($total_loss_stmt->fetch(PDO::FETCH_ASSOC)['total'] ?? 0);
+    
+    // Loss breakdown by broker
+    $broker_loss_stmt = $pdo->prepare("
+        SELECT 
+            COALESCE(a.broker_name, 'Unknown') as broker_name,
+            COALESCE(SUM(j.profit_loss), 0) as total_loss
+        FROM trading_journal j
+        LEFT JOIN trading_accounts a ON j.account_id = a.id
+        WHERE j.user_id = ? AND j.profit_loss < 0
+        GROUP BY a.broker_name
+        ORDER BY total_loss ASC
+    ");
+    $broker_loss_stmt->execute([$_SESSION['user_id']]);
+    $broker_losses = $broker_loss_stmt->fetchAll(PDO::FETCH_ASSOC);
+    
+    // Loss breakdown by account type
+    $type_loss_stmt = $pdo->prepare("
+        SELECT 
+            COALESCE(a.account_type, 'Unknown') as account_type,
+            COALESCE(SUM(j.profit_loss), 0) as total_loss,
+            COUNT(DISTINCT a.id) as account_count
+        FROM trading_journal j
+        LEFT JOIN trading_accounts a ON j.account_id = a.id
+        WHERE j.user_id = ? AND j.profit_loss < 0
+        GROUP BY a.account_type
+        ORDER BY total_loss ASC
+    ");
+    $type_loss_stmt->execute([$_SESSION['user_id']]);
+    $type_losses = $type_loss_stmt->fetchAll(PDO::FETCH_ASSOC);
+    
+    // Account type breakdown
+    $account_type_stmt = $pdo->prepare("
+        SELECT 
+            account_type,
+            COUNT(*) as count,
+            SUM(initial_balance) as total_invested,
+            SUM(current_balance) as total_current
+        FROM trading_accounts
+        WHERE user_id = ?
+        GROUP BY account_type
+    ");
+    $account_type_stmt->execute([$_SESSION['user_id']]);
+    $account_types = $account_type_stmt->fetchAll(PDO::FETCH_ASSOC);
+    
+    // Current total balance (sum of all current balances)
+    $current_balance_stmt = $pdo->prepare("SELECT SUM(current_balance) as total FROM trading_accounts WHERE user_id = ?");
+    $current_balance_stmt->execute([$_SESSION['user_id']]);
+    $current_total_balance = $current_balance_stmt->fetch(PDO::FETCH_ASSOC)['total'] ?? 0;
+    
+    // Net profit/loss (current balance - initial investment)
+    $net_pl = $current_total_balance - $total_invested;
+    
+    // Account status breakdown
+    $status_breakdown_stmt = $pdo->prepare("
+        SELECT 
+            status,
+            COUNT(*) as count,
+            SUM(initial_balance) as total_invested
+        FROM trading_accounts
+        WHERE user_id = ?
+        GROUP BY status
+    ");
+    $status_breakdown_stmt->execute([$_SESSION['user_id']]);
+    $status_breakdown = $status_breakdown_stmt->fetchAll(PDO::FETCH_ASSOC);
+    
+    // Recent withdrawals
+    $recent_withdrawals_stmt = $pdo->prepare("
+        SELECT w.*, a.account_name 
+        FROM account_withdrawals w
+        LEFT JOIN trading_accounts a ON w.account_id = a.id
+        WHERE w.user_id = ?
+        ORDER BY w.withdrawal_date DESC, w.created_at DESC
+        LIMIT 10
+    ");
+    $recent_withdrawals_stmt->execute([$_SESSION['user_id']]);
+    $recent_withdrawals = $recent_withdrawals_stmt->fetchAll(PDO::FETCH_ASSOC);
+    
+    // Recent accounts (include challenge_fee if column exists)
+    $columns_check_accounts = $pdo->query("SHOW COLUMNS FROM trading_accounts LIKE 'challenge_fee'")->fetch();
+    if ($columns_check_accounts) {
+        $recent_accounts_stmt = $pdo->prepare("
+            SELECT *, COALESCE(challenge_fee, 0) as challenge_fee FROM trading_accounts 
+            WHERE user_id = ? 
+            ORDER BY created_at DESC 
+            LIMIT 5
+        ");
+    } else {
+        $recent_accounts_stmt = $pdo->prepare("
+            SELECT *, 0 as challenge_fee FROM trading_accounts 
+            WHERE user_id = ? 
+            ORDER BY created_at DESC 
+            LIMIT 5
+        ");
+    }
+    $recent_accounts_stmt->execute([$_SESSION['user_id']]);
+    $recent_accounts = $recent_accounts_stmt->fetchAll(PDO::FETCH_ASSOC);
+    
+} catch (PDOException $e) {
+    die("Database error: " . $e->getMessage());
+}
+
+// Motivational quotes
+$quotes = [
+    "The goal of a successful trader is to make the best trades. Money is secondary.",
+    "Risk comes from not knowing what you're doing.",
+    "The stock market is filled with individuals who know the price of everything, but the value of nothing.",
+    "In trading, you have to be defensive and aggressive at the same time. If you are not aggressive, you are not going to make money, and if you are not defensive, you are not going to keep money.",
+    "The most important quality for an investor is temperament, not intellect.",
+    "Time in the market beats timing the market.",
+    "The best investment you can make is in yourself.",
+    "Don't look for the needle in the haystack. Just buy the haystack.",
+    "Rule No. 1: Never lose money. Rule No. 2: Never forget rule No. 1.",
+    "The stock market is a voting machine in the short run, but a weighing machine in the long run.",
+    "It's not how much money you make, but how much money you keep, how hard it works for you, and how many generations you keep it for.",
+    "The biggest risk is not taking any risk. In a world that's changing really quickly, the only strategy that is guaranteed to fail is not taking risks.",
+    "Price is what you pay. Value is what you get.",
+    "The market can stay irrational longer than you can stay solvent.",
+    "Be fearful when others are greedy and greedy when others are fearful."
+];
+$random_quote = $quotes[array_rand($quotes)];
+?>
 <!DOCTYPE html>
 <html lang="en">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Trading Community - NpLTrader</title>
+    <title>Portfolio - NpLTrader</title>
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
-    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
     <style>
         :root {
             --primary: #10b981;
@@ -54,6 +269,10 @@ $community_posts = [
             --text-primary: #ffffff;
             --text-secondary: #94a3b8;
             --border-color: #334155;
+            --success: #10b981;
+            --danger: #ef4444;
+            --warning: #f59e0b;
+            --info: #3b82f6;
         }
         
         * {
@@ -69,7 +288,7 @@ $community_posts = [
             overflow-x: hidden;
         }
         
-        /* Sidebar Styles */
+        /* Sidebar styles */
         .sidebar {
             position: fixed !important;
             left: 0;
@@ -79,319 +298,36 @@ $community_posts = [
             background-color: var(--dark-card);
             border-right: 1px solid var(--border-color);
             padding: 20px;
-            z-index: 1000;
+            z-index: 1050 !important;
             transition: transform 0.3s cubic-bezier(0.4, 0, 0.2, 1);
             overflow-y: auto;
             overflow-x: hidden;
+            transform: translateX(0);
         }
         
         .sidebar.closed {
             transform: translateX(-100%) !important;
         }
         
-        .sidebar.show {
-            transform: translateX(0) !important;
-        }
-        
-        .sidebar-header {
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-            margin-bottom: 40px;
-            padding-bottom: 20px;
-            border-bottom: 1px solid var(--border-color);
-        }
-        
-        .logo {
-            display: flex;
-            align-items: center;
-            gap: 10px;
-            font-size: 1.5rem;
-            font-weight: 700;
-            color: var(--text-primary);
-        }
-        
-        .logo-icon {
-            width: 40px;
-            height: 40px;
-            background: linear-gradient(135deg, var(--primary) 0%, var(--primary-dark) 100%);
-            border-radius: 8px;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            color: white;
-            font-weight: bold;
-        }
-        
-        .sidebar-close {
-            background: var(--primary) !important;
-            border: 2px solid var(--primary) !important;
-            border-radius: 8px;
-            color: white !important;
-            font-size: 1.4rem;
-            cursor: pointer;
-            padding: 0;
-            transition: all 0.3s;
-            display: flex !important;
-            align-items: center;
-            justify-content: center;
-            width: 45px;
-            height: 45px;
-            min-width: 45px;
-            min-height: 45px;
-            opacity: 1 !important;
-            visibility: visible !important;
-            z-index: 1000;
-            position: relative;
-            flex-shrink: 0;
-            box-shadow: 0 2px 8px rgba(16, 185, 129, 0.3);
-        }
-        
-        .sidebar-close i {
-            display: inline-block !important;
-            font-size: 1.5rem !important;
-            line-height: 1 !important;
-            width: auto !important;
-            height: auto !important;
-            color: white !important;
-            margin: 0 !important;
-            padding: 0 !important;
-        }
-        
-        .sidebar-close .close-arrow {
-            display: inline-block !important;
-            font-size: 2rem;
-            font-weight: bold;
-            line-height: 1;
-            color: white;
-            margin: 0;
-            padding: 0;
-        }
-        
-        .sidebar-close i.fa-angle-left {
-            display: none !important;
-        }
-        
-        .sidebar-close.show-icon i.fa-angle-left {
-            display: inline-block !important;
-        }
-        
-        .sidebar-close.show-icon .close-arrow {
-            display: none !important;
-        }
-        
-        .sidebar-close:hover {
-            background: var(--primary);
-            color: white;
-            border-color: var(--primary);
-            transform: translateX(-3px);
-        }
-        
         .sidebar-toggle-btn {
-            position: fixed;
-            left: 20px;
-            top: 20px;
-            z-index: 1001;
-            background: var(--primary);
-            border: none;
+            position: fixed !important;
+            left: 20px !important;
+            top: 20px !important;
+            z-index: 1051 !important;
+            background: #10b981 !important;
+            border: none !important;
             border-radius: 8px;
-            color: white;
+            color: white !important;
             font-size: 1.2rem;
-            cursor: pointer;
+            cursor: pointer !important;
             padding: 10px 12px;
             transition: all 0.3s;
-            box-shadow: 0 4px 12px rgba(16, 185, 129, 0.3);
-            display: none;
-        }
-        
-        .sidebar-toggle-btn:hover {
-            background: var(--primary-dark);
-            transform: scale(1.1);
-            box-shadow: 0 6px 16px rgba(16, 185, 129, 0.4);
+            box-shadow: 0 4px 12px rgba(16, 185, 129, 0.5);
+            display: none !important;
         }
         
         .sidebar-toggle-btn.show {
-            display: block;
-        }
-        
-        .nav-menu {
-            list-style: none;
-        }
-        
-        .nav-item {
-            margin-bottom: 8px;
-        }
-        
-        .nav-link {
-            display: flex;
-            align-items: center;
-            gap: 12px;
-            padding: 12px 16px;
-            color: var(--text-primary) !important;
-            text-decoration: none;
-            border-radius: 8px;
-            transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
-            font-weight: 500;
-            position: relative;
-            overflow: hidden;
-        }
-        
-        .nav-link.dashboard-link {
-            padding: 16px 20px;
-            font-size: 1.1rem;
-            font-weight: 600;
-            margin-bottom: 12px;
-        }
-        
-        .nav-link.dashboard-link i {
-            font-size: 1.3rem;
-            width: 24px;
-        }
-        
-        .nav-link:not(.dashboard-link) {
-            padding: 10px 14px;
-            font-size: 0.9rem;
-            font-weight: 500;
-        }
-        
-        .nav-link:not(.dashboard-link) i {
-            font-size: 1rem;
-            width: 18px;
-        }
-        
-        .nav-link::before {
-            content: '';
-            position: absolute;
-            left: 0;
-            top: 0;
-            width: 4px;
-            height: 100%;
-            background: var(--primary);
-            transform: scaleY(0);
-            transition: transform 0.3s cubic-bezier(0.4, 0, 0.2, 1);
-        }
-        
-        .nav-link:hover {
-            background-color: var(--dark-hover);
-            color: var(--text-primary) !important;
-            transform: translateX(5px);
-            box-shadow: 0 4px 12px rgba(16, 185, 129, 0.2);
-        }
-        
-        .nav-link:hover::before {
-            transform: scaleY(1);
-        }
-        
-        .nav-link.active {
-            background: linear-gradient(135deg, var(--primary) 0%, var(--primary-dark) 100%) !important;
-            color: #ffffff !important;
-            font-weight: 600;
-            box-shadow: 0 4px 16px rgba(16, 185, 129, 0.4);
-            transform: translateX(0);
-        }
-        
-        .nav-link.active::before {
-            transform: scaleY(1);
-            background: rgba(255, 255, 255, 0.3);
-        }
-        
-        .nav-link.active i {
-            color: #ffffff !important;
-            animation: pulse 2s infinite;
-        }
-        
-        /* Calculator Dropdown in Sidebar */
-        .calculator-dropdown {
-            position: relative;
-        }
-        
-        .calculator-dropdown-btn {
-            background: none !important;
-            border: none !important;
-            width: 100%;
-            text-align: left;
-            cursor: pointer;
-            display: flex;
-            align-items: center;
-            gap: 12px;
-            padding: 10px 14px;
-            color: var(--text-primary) !important;
-            font-weight: 500;
-            font-size: 0.9rem;
-            transition: all 0.3s;
-        }
-        
-        .calculator-dropdown-btn i.fa-chevron-down {
-            margin-left: auto;
-            transition: transform 0.3s;
-        }
-        
-        .calculator-dropdown-btn:hover {
-            background-color: var(--dark-hover) !important;
-            color: var(--text-primary) !important;
-        }
-        
-        .calculator-dropdown.active .calculator-dropdown-btn i.fa-chevron-down {
-            transform: rotate(180deg);
-        }
-        
-        .calculator-dropdown-menu {
-            display: none;
-            background-color: var(--dark-bg);
-            border-left: 3px solid var(--primary);
-            margin-left: 20px;
-            margin-top: 5px;
-            margin-bottom: 8px;
-            border-radius: 0 8px 8px 0;
-            overflow: hidden;
-        }
-        
-        .calculator-dropdown-menu.show {
-            display: block;
-        }
-        
-        .calculator-dropdown-item {
-            display: block;
-            padding: 10px 20px;
-            color: var(--text-secondary);
-            text-decoration: none;
-            transition: all 0.3s;
-            font-size: 0.85rem;
-            border-bottom: 1px solid var(--border-color);
-        }
-        
-        .calculator-dropdown-item:last-child {
-            border-bottom: none;
-        }
-        
-        .calculator-dropdown-item:hover {
-            background-color: var(--dark-hover);
-            color: var(--primary);
-            padding-left: 25px;
-        }
-        
-        .calculator-dropdown-item.active {
-            background-color: rgba(16, 185, 129, 0.1);
-            color: var(--primary);
-            font-weight: 600;
-            border-left: 3px solid var(--primary);
-        }
-        
-        .nav-link i {
-            width: 20px;
-            text-align: center;
-            color: var(--text-primary);
-            transition: all 0.3s;
-        }
-        
-        .nav-link:hover i {
-            color: var(--primary);
-            transform: scale(1.2);
-        }
-        
-        @keyframes pulse {
-            0%, 100% { transform: scale(1); }
-            50% { transform: scale(1.1); }
+            display: block !important;
         }
         
         .main-content {
@@ -399,561 +335,792 @@ $community_posts = [
             padding: 30px;
             min-height: 100vh;
             transition: margin-left 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+        }
+        
+        .portfolio-header {
+            margin-bottom: 30px;
+        }
+        
+        .portfolio-header h1 {
+            font-size: 2.5rem;
+            font-weight: 700;
+            color: var(--text-primary);
+            margin-bottom: 10px;
+        }
+        
+        .portfolio-header p {
+            color: var(--text-secondary);
+            font-size: 1.1rem;
+        }
+        
+        .stat-card {
+            background: linear-gradient(135deg, var(--dark-card) 0%, var(--dark-hover) 100%);
+            border: 1px solid var(--border-color);
+            border-radius: 16px;
+            padding: 25px;
+            margin-bottom: 20px;
+            transition: all 0.3s ease;
+            position: relative;
+            overflow: hidden;
+        }
+        
+        .stat-card::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
+            height: 4px;
+            background: linear-gradient(90deg, var(--primary) 0%, var(--primary-dark) 100%);
+        }
+        
+        .stat-card:hover {
+            transform: translateY(-5px);
+            box-shadow: 0 10px 30px rgba(16, 185, 129, 0.3);
+            border-color: var(--primary);
+        }
+        
+        .stat-icon {
+            width: 60px;
+            height: 60px;
+            border-radius: 12px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 1.8rem;
+            margin-bottom: 15px;
+        }
+        
+        .stat-icon.primary { background: rgba(16, 185, 129, 0.2); color: var(--primary); }
+        .stat-icon.success { background: rgba(16, 185, 129, 0.2); color: var(--success); }
+        .stat-icon.danger { background: rgba(239, 68, 68, 0.2); color: var(--danger); }
+        .stat-icon.warning { background: rgba(245, 158, 11, 0.2); color: var(--warning); }
+        .stat-icon.info { background: rgba(59, 130, 246, 0.2); color: var(--info); }
+        
+        .stat-value {
+            font-size: 2.2rem;
+            font-weight: 700;
+            color: var(--text-primary);
+            margin-bottom: 5px;
+        }
+        
+        .stat-label {
+            color: var(--text-secondary);
+            font-size: 0.95rem;
+            font-weight: 500;
+        }
+        
+        .stat-change {
+            font-size: 0.85rem;
+            margin-top: 8px;
+        }
+        
+        .stat-change.positive {
+            color: var(--success);
+        }
+        
+        .stat-change.negative {
+            color: var(--danger);
+        }
+        
+        .card {
+            background: var(--dark-card);
+            border: 1px solid var(--border-color);
+            border-radius: 16px;
+            padding: 25px;
+            margin-bottom: 25px;
+        }
+        
+        .card-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 20px;
+            padding-bottom: 15px;
+            border-bottom: 2px solid var(--border-color);
+        }
+        
+        .card-header h5 {
+            color: var(--text-primary);
+            font-size: 1.3rem;
+            font-weight: 600;
+            margin: 0;
+        }
+        
+        .chart-container {
+            position: relative;
+            height: 300px;
+            margin-top: 20px;
+        }
+        
+        .table-dark {
+            background-color: transparent;
+            color: var(--text-primary);
+        }
+        
+        .table-dark th {
+            background-color: var(--dark-hover);
+            border-color: var(--border-color);
+            color: var(--text-primary);
+            font-weight: 600;
+        }
+        
+        .table-dark td {
+            border-color: var(--border-color);
+            color: var(--text-primary);
+        }
+        
+        .table-dark tbody tr:hover {
+            background-color: var(--dark-hover);
+        }
+        
+        .badge {
+            padding: 6px 12px;
+            border-radius: 6px;
+            font-weight: 600;
+        }
+        
+        .motivation-card {
+            background: linear-gradient(135deg, rgba(16, 185, 129, 0.1) 0%, rgba(5, 150, 105, 0.1) 100%);
+            border: 2px solid var(--primary);
+            border-radius: 16px;
+            padding: 30px;
+            text-align: center;
+            margin-top: 30px;
+            position: relative;
+            overflow: hidden;
+        }
+        
+        .motivation-card::before {
+            content: '"';
+            position: absolute;
+            top: -20px;
+            left: 20px;
+            font-size: 120px;
+            color: var(--primary);
+            opacity: 0.2;
+            font-family: Georgia, serif;
+        }
+        
+        .motivation-quote {
+            font-size: 1.3rem;
+            font-style: italic;
+            color: var(--text-primary);
+            line-height: 1.8;
+            margin-bottom: 20px;
             position: relative;
             z-index: 1;
         }
         
-        .user-info {
-            display: flex;
-            align-items: center;
-            gap: 12px;
-        }
-        
-        .user-avatar {
-            width: 40px;
-            height: 40px;
-            border-radius: 50%;
-            background: linear-gradient(135deg, var(--primary) 0%, var(--primary-dark) 100%);
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            color: white;
+        .motivation-author {
+            color: var(--primary);
             font-weight: 600;
-            overflow: hidden;
-            position: relative;
+            font-size: 1rem;
         }
         
-        .user-avatar img {
-            width: 100%;
-            height: 100%;
-            object-fit: cover;
-        }
-        
-        .user-details {
-            display: flex;
-            flex-direction: column;
-        }
-        
-        .user-name {
-            font-weight: 600;
-            color: var(--text-primary);
-            font-size: 0.9rem;
-        }
-        
-        .user-id {
-            font-size: 0.75rem;
-            color: var(--text-secondary);
-        }
-        
-        .top-navbar {
-            background-color: var(--dark-card) !important;
-            border-bottom: 1px solid var(--border-color);
-            box-shadow: 0 2px 10px rgba(0,0,0,0.3);
-            padding: 1rem 0;
-        }
-        
-        .top-navbar .navbar-brand {
-            color: var(--primary) !important;
-            font-weight: 700;
-        }
-        
-        .top-navbar .nav-link {
-            color: var(--text-secondary) !important;
-            font-weight: 500;
-            margin: 0 0.5rem;
-            transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
-            padding: 8px 16px;
-            border-radius: 6px;
-            position: relative;
-        }
-        
-        .top-navbar .nav-link::after {
-            content: '';
-            position: absolute;
-            bottom: 0;
-            left: 50%;
-            width: 0;
-            height: 2px;
+        .btn-refresh-quote {
             background: var(--primary);
-            transform: translateX(-50%);
-            transition: width 0.3s;
+            border: none;
+            color: white;
+            padding: 10px 20px;
+            border-radius: 8px;
+            cursor: pointer;
+            transition: all 0.3s;
+            margin-top: 15px;
         }
         
-        .top-navbar .nav-link:hover {
-            background-color: var(--primary) !important;
-            color: #ffffff !important;
+        .btn-refresh-quote:hover {
+            background: var(--primary-dark);
             transform: translateY(-2px);
         }
         
-        .top-navbar .nav-link:hover::after {
-            width: 80%;
+        .progress-bar-custom {
+            height: 8px;
+            border-radius: 10px;
+            background: var(--dark-hover);
+            overflow: hidden;
+            margin-top: 10px;
         }
         
-        .top-navbar .nav-link.active {
-            background-color: var(--primary) !important;
-            color: #ffffff !important;
-            box-shadow: 0 4px 12px rgba(16, 185, 129, 0.3);
+        .progress-fill {
+            height: 100%;
+            border-radius: 10px;
+            transition: width 0.5s ease;
         }
         
-        .top-navbar .nav-link.active::after {
-            width: 80%;
+        .account-type-badge {
+            display: inline-block;
+            padding: 4px 12px;
+            border-radius: 20px;
+            font-size: 0.75rem;
+            font-weight: 600;
+            text-transform: uppercase;
         }
         
-        .top-navbar .navbar-toggler {
-            border-color: var(--border-color);
-        }
-        
-        .top-navbar .navbar-toggler-icon {
-            background-image: url("data:image/svg+xml,%3csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 30 30'%3e%3cpath stroke='rgba%28148, 163, 184, 1%29' stroke-linecap='round' stroke-miterlimit='10' stroke-width='2' d='M4 7h22M4 15h22M4 23h22'/%3e%3c/svg%3e");
-        }
+        .account-type-forex { background: rgba(59, 130, 246, 0.2); color: #60a5fa; }
+        .account-type-propfirm { background: rgba(168, 85, 247, 0.2); color: #a78bfa; }
+        .account-type-nepse { background: rgba(16, 185, 129, 0.2); color: #34d399; }
+        .account-type-crypto { background: rgba(245, 158, 11, 0.2); color: #fbbf24; }
+        .account-type-other { background: rgba(148, 163, 184, 0.2); color: #94a3b8; }
         
         @media (max-width: 768px) {
-            .sidebar {
-                transform: translateX(-100%);
-            }
-            
-            .sidebar.show {
-                transform: translateX(0);
-            }
-            
-            .sidebar.closed {
-                transform: translateX(-100%);
-            }
-            
             .main-content {
                 margin-left: 0;
             }
-            
-            .sidebar-toggle-btn {
-                display: block !important;
-            }
-        }
-        
-        .sidebar.closed ~ .main-content {
-            margin-left: 0 !important;
-        }
-        
-        .community-card {
-            background: var(--dark-card);
-            border-radius: 12px;
-            padding: 20px;
-            margin-bottom: 15px;
-            border: 1px solid #334155;
-        }
-        
-        .post-card {
-            background: var(--dark-card);
-            border-radius: 12px;
-            padding: 20px;
-            margin-bottom: 15px;
-            border: 1px solid #334155;
-        }
-        
-        .user-avatar {
-            width: 40px;
-            height: 40px;
-            border-radius: 50%;
-            background: var(--primary);
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            font-weight: bold;
-            color: white;
-        }
-        
-        .btn-primary {
-            background-color: var(--primary);
-            border-color: var(--primary);
-        }
-        
-        .btn-primary:hover {
-            background-color: var(--primary-dark);
-            border-color: var(--primary-dark);
-        }
-        
-        .form-control {
-            background-color: var(--dark-bg);
-            border: 1px solid var(--border-color);
-            color: var(--text-primary);
-        }
-        
-        .form-control:focus {
-            background-color: var(--dark-bg);
-            border-color: var(--primary);
-            color: var(--text-primary);
-            box-shadow: 0 0 0 0.25rem rgba(16, 185, 129, 0.25);
         }
     </style>
 </head>
 <body>
-    <!-- Top Navigation Bar -->
-    <nav class="navbar navbar-expand-lg navbar-light sticky-top top-navbar">
-        <div class="container">
-            <a class="navbar-brand fw-bold" href="../index.php">
-                <i class="fas fa-chart-line text-primary me-2"></i>NpLTrader
-            </a>
-            <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbarNav">
-                <span class="navbar-toggler-icon"></span>
-            </button>
-            <div class="collapse navbar-collapse" id="navbarNav">
-                <ul class="navbar-nav mx-auto">
-                    <li class="nav-item">
-                        <a class="nav-link" href="../index.php">HOME</a>
-                    </li>
-                    <li class="nav-item">
-                        <a class="nav-link" href="../blog.php">BLOG</a>
-                    </li>
-                    <li class="nav-item">
-                        <a class="nav-link" href="../course/course.php">COURSE</a>
-                    </li>
-                    <li class="nav-item">
-                        <a class="nav-link" href="../about.php">ABOUT US</a>
-                    </li>
-                    <li class="nav-item">
-                        <a class="nav-link" href="../contact.php">CONTACT</a>
-                    </li>
-                    <li class="nav-item">
-                        <a class="nav-link active" href="dashboard.php">DASHBOARD</a>
-                    </li>
-                </ul>
-                <div class="d-flex align-items-center">
-                    <?php 
-                    $profile_image = $user['profile_image'] ?? null;
-                    ?>
-                    <div class="dropdown me-3">
-                        <button class="btn btn-link text-decoration-none dropdown-toggle d-flex align-items-center" type="button" data-bs-toggle="dropdown" style="color: var(--primary) !important; padding: 0;">
-                            <?php if (!empty($profile_image) && file_exists($profile_image)): ?>
-                                <img src="<?php echo htmlspecialchars($profile_image); ?>" alt="Profile" style="width: 32px; height: 32px; border-radius: 50%; object-fit: cover; margin-right: 8px; border: 2px solid var(--primary);">
-                            <?php else: ?>
-                                <div style="width: 32px; height: 32px; border-radius: 50%; background: var(--primary); color: white; display: flex; align-items: center; justify-content: center; margin-right: 8px; font-weight: bold;">
-                                    <?php echo strtoupper(substr($user['username'], 0, 1)); ?>
-                                </div>
-                            <?php endif; ?>
-                            <span><?php echo htmlspecialchars($user['username']); ?></span>
-                        </button>
-                        <ul class="dropdown-menu dropdown-menu-end">
-                            <li><a class="dropdown-item" href="dashboard.php"><i class="fas fa-th-large me-2"></i>Dashboard</a></li>
-                            <li><a class="dropdown-item" href="../user/profile.php"><i class="fas fa-user me-2"></i>Profile</a></li>
-                            <li><hr class="dropdown-divider"></li>
-                            <li><a class="dropdown-item text-danger" href="../logout.php"><i class="fas fa-sign-out-alt me-2"></i>Logout</a></li>
-                        </ul>
-                    </div>
-                </div>
-            </div>
-        </div>
-    </nav>
-
-    <?php include 'sidebar.php'; ?>
+    <?php include __DIR__.'/sidebar.php'; ?>
     
     <main class="main-content">
-        <div class="container-fluid py-4">
-            <!-- Header -->
-            <div class="mb-4">
-                <h1 class="h2">Trading Community</h1>
-                <p class="text-muted">Learn from fellow traders and share experiences</p>
-            </div>
-
-            <div class="row">
-                <!-- Community Feed -->
-                <div class="col-lg-8">
-                    <!-- Create Post -->
-                    <div class="community-card">
-                        <div class="d-flex align-items-center mb-3">
-                            <div class="user-avatar me-3">
-                                <?php echo strtoupper(substr($user['username'], 0, 1)); ?>
-                            </div>
-                            <input type="text" class="form-control" placeholder="Share your trading experience or ask a question...">
-                        </div>
-                        <div class="d-flex justify-content-between">
-                            <button class="btn btn-sm btn-outline-primary">
-                                <i class="fas fa-chart-line me-1"></i>Trade Idea
-                            </button>
-                            <button class="btn btn-sm btn-outline-success">
-                                <i class="fas fa-question me-1"></i>Ask Question
-                            </button>
-                            <button class="btn btn-sm btn-outline-warning">
-                                <i class="fas fa-lightbulb me-1"></i>Share Tip
-                            </button>
-                            <button class="btn btn-primary btn-sm">Post</button>
-                        </div>
+        <div class="portfolio-header">
+            <h1><i class="fas fa-chart-pie me-2"></i>Portfolio Overview</h1>
+            <p>Complete analysis of your trading accounts and performance</p>
+        </div>
+        
+        <!-- Main Statistics -->
+        <div class="row mb-4">
+            <div class="col-md-3">
+                <div class="stat-card">
+                    <div class="stat-icon primary">
+                        <i class="fas fa-wallet"></i>
                     </div>
-
-                    <!-- Community Posts -->
-                    <?php foreach ($community_posts as $post): ?>
-                        <div class="post-card">
-                            <div class="d-flex align-items-center mb-3">
-                                <div class="user-avatar me-3">
-                                    <?php echo strtoupper(substr($post['user'], 0, 1)); ?>
-                                </div>
-                                <div>
-                                    <h6 class="mb-0"><?php echo $post['user']; ?></h6>
-                                    <small class="text-muted"><?php echo $post['time']; ?></small>
-                                </div>
-                            </div>
-                            
-                            <p class="mb-3"><?php echo $post['content']; ?></p>
-                            
-                            <div class="d-flex justify-content-between">
-                                <div>
-                                    <button class="btn btn-sm btn-outline-primary me-2">
-                                        <i class="fas fa-thumbs-up me-1"></i><?php echo $post['likes']; ?>
-                                    </button>
-                                    <button class="btn btn-sm btn-outline-secondary">
-                                        <i class="fas fa-comment me-1"></i><?php echo $post['comments']; ?> Comments
-                                    </button>
-                                </div>
-                                <button class="btn btn-sm btn-outline-info">
-                                    <i class="fas fa-share me-1"></i>Share
-                                </button>
-                            </div>
-                        </div>
-                    <?php endforeach; ?>
+                    <div class="stat-value"><?php echo number_format($total_accounts); ?></div>
+                    <div class="stat-label">Total Accounts Created</div>
                 </div>
-
-                <!-- Community Stats & Mentors -->
-                <div class="col-lg-4">
-                    <!-- Community Stats -->
-                    <div class="community-card">
-                        <h6 class="mb-3">Community Stats</h6>
-                        <div class="row text-center">
-                            <div class="col-4">
-                                <h5 class="text-primary">1,234</h5>
-                                <small class="text-muted">Traders</small>
-                            </div>
-                            <div class="col-4">
-                                <h5 class="text-success">456</h5>
-                                <small class="text-muted">Active Today</small>
-                            </div>
-                            <div class="col-4">
-                                <h5 class="text-warning">89</h5>
-                                <small class="text-muted">Mentors</small>
-                            </div>
-                        </div>
+            </div>
+            <div class="col-md-3">
+                <div class="stat-card">
+                    <div class="stat-icon info">
+                        <i class="fas fa-dollar-sign"></i>
                     </div>
-
-                    <!-- Featured Mentors -->
-                    <div class="community-card">
-                        <h6 class="mb-3">Featured Mentors</h6>
-                        <div class="d-flex align-items-center mb-3">
-                            <div class="user-avatar me-3 bg-warning">R</div>
-                            <div>
-                                <h6 class="mb-0">Rajesh Shrestha</h6>
-                                <small class="text-muted">10+ years trading experience</small>
-                            </div>
+                    <div class="stat-value">रु <?php echo number_format($total_invested, 2); ?></div>
+                    <div class="stat-label">Total Money Invested</div>
+                    <?php if ($total_challenge_fees > 0): ?>
+                        <div class="stat-change text-muted" style="font-size: 0.75rem; margin-top: 5px;">
+                            (रु <?php echo number_format($total_challenge_fees, 2); ?> from prop firm challenge fees)
                         </div>
-                        <div class="d-flex align-items-center mb-3">
-                            <div class="user-avatar me-3 bg-success">S</div>
-                            <div>
-                                <h6 class="mb-0">Sita Koirala</h6>
-                                <small class="text-muted">NEPSE Specialist</small>
-                            </div>
-                        </div>
-                        <button class="btn btn-outline-primary btn-sm w-100">
-                            Find a Mentor
-                        </button>
+                    <?php endif; ?>
+                    <small class="text-muted d-block mt-2" style="font-size: 0.7rem;">
+                        Note: For prop firms, only challenge fees are counted as investment. Account value is separate.
+                    </small>
+                </div>
+            </div>
+            <div class="col-md-3">
+                <div class="stat-card">
+                    <div class="stat-icon success">
+                        <i class="fas fa-check-circle"></i>
                     </div>
-
-                    <!-- Upcoming Events -->
-                    <div class="community-card">
-                        <h6 class="mb-3">Upcoming Events</h6>
-                        <div class="mb-3">
-                            <small class="text-primary">Tomorrow • 7:00 PM NPT</small>
-                            <h6 class="mb-1">Live Q&A: Risk Management</h6>
-                            <small class="text-muted">With expert trader Anil Gurung</small>
-                        </div>
-                        <div class="mb-3">
-                            <small class="text-success">Friday • 6:00 PM NPT</small>
-                            <h6 class="mb-1">Weekly Market Review</h6>
-                            <small class="text-muted">NEPSE analysis & next week outlook</small>
-                        </div>
-                        <button class="btn btn-outline-success btn-sm w-100">
-                            View All Events
-                        </button>
+                    <div class="stat-value"><?php echo number_format($active_accounts); ?></div>
+                    <div class="stat-label">Active Accounts</div>
+                </div>
+            </div>
+            <div class="col-md-3">
+                <div class="stat-card">
+                    <div class="stat-icon danger">
+                        <i class="fas fa-times-circle"></i>
+                    </div>
+                    <div class="stat-value"><?php echo number_format($failed_accounts); ?></div>
+                    <div class="stat-label">Failed/Closed Accounts</div>
+                </div>
+            </div>
+        </div>
+        
+        <!-- Financial Overview -->
+        <div class="row mb-4">
+            <div class="col-md-3">
+                <div class="stat-card">
+                    <div class="stat-icon <?php echo $lifetime_pl >= 0 ? 'success' : 'danger'; ?>">
+                        <i class="fas fa-chart-line"></i>
+                    </div>
+                    <div class="stat-value <?php echo $lifetime_pl >= 0 ? 'text-success' : 'text-danger'; ?>">
+                        रु <?php echo number_format($lifetime_pl, 2); ?>
+                    </div>
+                    <div class="stat-label">Lifetime Profit/Loss</div>
+                </div>
+            </div>
+            <div class="col-md-3">
+                <div class="stat-card">
+                    <div class="stat-icon danger">
+                        <i class="fas fa-arrow-down"></i>
+                    </div>
+                    <div class="stat-value text-danger">रु <?php echo number_format($total_loss, 2); ?></div>
+                    <div class="stat-label">Total Loss</div>
+                </div>
+            </div>
+            <div class="col-md-3">
+                <div class="stat-card">
+                    <div class="stat-icon warning">
+                        <i class="fas fa-money-bill-wave"></i>
+                    </div>
+                    <div class="stat-value">रु <?php echo number_format($total_withdrawals, 2); ?></div>
+                    <div class="stat-label">Total Withdrawals</div>
+                </div>
+            </div>
+            <div class="col-md-3">
+                <div class="stat-card">
+                    <div class="stat-icon <?php echo $net_pl >= 0 ? 'success' : 'danger'; ?>">
+                        <i class="fas fa-balance-scale"></i>
+                    </div>
+                    <div class="stat-value <?php echo $net_pl >= 0 ? 'text-success' : 'text-danger'; ?>">
+                        रु <?php echo number_format($net_pl, 2); ?>
+                    </div>
+                    <div class="stat-label">Net P/L (Current - Invested)</div>
+                </div>
+            </div>
+        </div>
+        
+        <!-- Charts Row -->
+        <div class="row mb-4">
+            <div class="col-md-6">
+                <div class="card">
+                    <div class="card-header">
+                        <h5><i class="fas fa-chart-pie me-2"></i>Account Type Distribution</h5>
+                    </div>
+                    <div class="chart-container">
+                        <canvas id="accountTypeChart"></canvas>
+                    </div>
+                </div>
+            </div>
+            <div class="col-md-6">
+                <div class="card">
+                    <div class="card-header">
+                        <h5><i class="fas fa-chart-bar me-2"></i>Account Status Breakdown</h5>
+                    </div>
+                    <div class="chart-container">
+                        <canvas id="statusChart"></canvas>
                     </div>
                 </div>
             </div>
         </div>
+        
+        <!-- Loss Breakdown -->
+        <div class="row mb-4">
+            <div class="col-md-6">
+                <div class="card">
+                    <div class="card-header">
+                        <h5><i class="fas fa-exclamation-triangle me-2 text-danger"></i>Loss by Broker</h5>
+                    </div>
+                    <div class="table-responsive">
+                        <table class="table table-dark table-sm">
+                            <thead>
+                                <tr>
+                                    <th>Broker</th>
+                                    <th>Loss Amount</th>
+                                    <th>Percentage</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                <?php if (empty($broker_losses)): ?>
+                                    <tr><td colspan="3" class="text-center text-muted">No loss data available</td></tr>
+                                <?php else: 
+                                    $total_broker_loss = array_sum(array_column($broker_losses, 'total_loss'));
+                                    foreach ($broker_losses as $broker):
+                                        $percentage = $total_broker_loss != 0 ? (abs($broker['total_loss']) / abs($total_broker_loss)) * 100 : 0;
+                                ?>
+                                    <tr>
+                                        <td><strong><?php echo htmlspecialchars($broker['broker_name']); ?></strong></td>
+                                        <td class="text-danger">रु <?php echo number_format(abs($broker['total_loss']), 2); ?></td>
+                                        <td>
+                                            <div class="progress-bar-custom">
+                                                <div class="progress-fill bg-danger" style="width: <?php echo $percentage; ?>%"></div>
+                                            </div>
+                                            <small class="text-muted"><?php echo number_format($percentage, 1); ?>%</small>
+                                        </td>
+                                    </tr>
+                                <?php endforeach; endif; ?>
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+            
+            <div class="col-md-6">
+                <div class="card">
+                    <div class="card-header">
+                        <h5><i class="fas fa-chart-line me-2 text-danger"></i>Loss by Account Type</h5>
+                    </div>
+                    <div class="table-responsive">
+                        <table class="table table-dark table-sm">
+                            <thead>
+                                <tr>
+                                    <th>Account Type</th>
+                                    <th>Accounts</th>
+                                    <th>Loss Amount</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                <?php if (empty($type_losses)): ?>
+                                    <tr><td colspan="3" class="text-center text-muted">No loss data available</td></tr>
+                                <?php else: ?>
+                                    <?php foreach ($type_losses as $type): ?>
+                                        <tr>
+                                            <td>
+                                                <span class="account-type-badge account-type-<?php echo $type['account_type']; ?>">
+                                                    <?php echo ucfirst($type['account_type']); ?>
+                                                </span>
+                                            </td>
+                                            <td><?php echo $type['account_count']; ?></td>
+                                            <td class="text-danger">रु <?php echo number_format(abs($type['total_loss']), 2); ?></td>
+                                        </tr>
+                                    <?php endforeach; endif; ?>
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+        </div>
+        
+        <!-- Account Type Details -->
+        <div class="row mb-4">
+            <div class="col-md-12">
+                <div class="card">
+                    <div class="card-header">
+                        <h5><i class="fas fa-list me-2"></i>Account Type Breakdown</h5>
+                    </div>
+                    <div class="table-responsive">
+                        <table class="table table-dark">
+                            <thead>
+                                <tr>
+                                    <th>Account Type</th>
+                                    <th>Count</th>
+                                    <th>Total Invested</th>
+                                    <th>Current Balance</th>
+                                    <th>P/L</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                <?php if (empty($account_types)): ?>
+                                    <tr><td colspan="5" class="text-center text-muted">No accounts yet</td></tr>
+                                <?php else: ?>
+                                    <?php foreach ($account_types as $type): 
+                                        $type_pl = ($type['total_current'] ?? 0) - ($type['total_invested'] ?? 0);
+                                    ?>
+                                        <tr>
+                                            <td>
+                                                <span class="account-type-badge account-type-<?php echo $type['account_type']; ?>">
+                                                    <?php echo ucfirst($type['account_type']); ?>
+                                                </span>
+                                            </td>
+                                            <td><?php echo $type['count']; ?></td>
+                                            <td>रु <?php echo number_format($type['total_invested'] ?? 0, 2); ?></td>
+                                            <td>रु <?php echo number_format($type['total_current'] ?? 0, 2); ?></td>
+                                            <td class="<?php echo $type_pl >= 0 ? 'text-success' : 'text-danger'; ?>">
+                                                <?php echo $type_pl >= 0 ? '+' : ''; ?>रु <?php echo number_format($type_pl, 2); ?>
+                                            </td>
+                                        </tr>
+                                    <?php endforeach; endif; ?>
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+        </div>
+        
+        <!-- Withdrawals Breakdown -->
+        <?php if (!empty($withdrawals_by_platform)): ?>
+        <div class="row mb-4">
+            <div class="col-md-12">
+                <div class="card">
+                    <div class="card-header">
+                        <h5><i class="fas fa-money-bill-wave me-2 text-success"></i>Withdrawals by Platform</h5>
+                    </div>
+                    <div class="table-responsive">
+                        <table class="table table-dark table-sm">
+                            <thead>
+                                <tr>
+                                    <th>Platform</th>
+                                    <th>Count</th>
+                                    <th>Total Amount</th>
+                                    <th>Percentage</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                <?php 
+                                $total_withdrawal_amount = array_sum(array_column($withdrawals_by_platform, 'total_amount'));
+                                foreach ($withdrawals_by_platform as $w): 
+                                    $percentage = $total_withdrawal_amount > 0 ? ($w['total_amount'] / $total_withdrawal_amount) * 100 : 0;
+                                ?>
+                                    <tr>
+                                        <td><strong class="text-capitalize"><?php echo htmlspecialchars($w['platform']); ?></strong></td>
+                                        <td><?php echo $w['count']; ?></td>
+                                        <td class="text-success">रु <?php echo number_format($w['total_amount'], 2); ?></td>
+                                        <td>
+                                            <div class="progress-bar-custom">
+                                                <div class="progress-fill bg-success" style="width: <?php echo $percentage; ?>%"></div>
+                                            </div>
+                                            <small class="text-muted"><?php echo number_format($percentage, 1); ?>%</small>
+                                        </td>
+                                    </tr>
+                                <?php endforeach; ?>
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+        </div>
+        <?php endif; ?>
+        
+        <!-- Recent Withdrawals -->
+        <?php if (!empty($recent_withdrawals)): ?>
+        <div class="row mb-4">
+            <div class="col-md-12">
+                <div class="card">
+                    <div class="card-header">
+                        <h5><i class="fas fa-history me-2"></i>Recent Withdrawals</h5>
+                    </div>
+                    <div class="table-responsive">
+                        <table class="table table-dark">
+                            <thead>
+                                <tr>
+                                    <th>Date</th>
+                                    <th>Account</th>
+                                    <th>Amount</th>
+                                    <th>Platform</th>
+                                    <th>Details</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                <?php foreach ($recent_withdrawals as $w): ?>
+                                    <tr>
+                                        <td><?php echo date('M d, Y', strtotime($w['withdrawal_date'])); ?></td>
+                                        <td><?php echo htmlspecialchars($w['account_name'] ?? 'N/A'); ?></td>
+                                        <td class="text-success"><strong><?php echo $w['currency']; ?> <?php echo number_format($w['withdrawal_amount'], 2); ?></strong></td>
+                                        <td><span class="badge bg-success text-capitalize"><?php echo htmlspecialchars($w['platform']); ?></span></td>
+                                        <td><?php echo htmlspecialchars($w['platform_details'] ?? '-'); ?></td>
+                                    </tr>
+                                <?php endforeach; ?>
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+        </div>
+        <?php endif; ?>
+        
+        <!-- Recent Accounts -->
+        <div class="row mb-4">
+            <div class="col-md-12">
+                <div class="card">
+                    <div class="card-header">
+                        <h5><i class="fas fa-clock me-2"></i>Recent Accounts</h5>
+                        <a href="journal.php" class="btn btn-sm btn-primary">View All</a>
+                    </div>
+                    <div class="table-responsive">
+                        <table class="table table-dark">
+                            <thead>
+                                <tr>
+                                    <th>Account Name</th>
+                                    <th>Type</th>
+                                    <th>Broker</th>
+                                    <th>Account Value</th>
+                                    <th>Challenge Fee</th>
+                                    <th>Current Balance</th>
+                                    <th>P/L</th>
+                                    <th>Status</th>
+                                    <th>Created</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                <?php if (empty($recent_accounts)): ?>
+                                    <tr><td colspan="9" class="text-center text-muted">No accounts yet</td></tr>
+                                <?php else: ?>
+                                    <?php foreach ($recent_accounts as $account): 
+                                        $account_pl = $account['current_balance'] - $account['initial_balance'];
+                                        $challenge_fee = isset($account['challenge_fee']) ? floatval($account['challenge_fee']) : 0;
+                                    ?>
+                                        <tr>
+                                            <td><strong><?php echo htmlspecialchars($account['account_name']); ?></strong></td>
+                                            <td>
+                                                <span class="account-type-badge account-type-<?php echo $account['account_type']; ?>">
+                                                    <?php echo ucfirst($account['account_type']); ?>
+                                                </span>
+                                            </td>
+                                            <td><?php echo htmlspecialchars($account['broker_name'] ?? 'N/A'); ?></td>
+                                            <td><?php echo $account['currency']; ?> <?php echo number_format($account['initial_balance'], 2); ?></td>
+                                            <td>
+                                                <?php if ($account['account_type'] === 'propfirm' && $challenge_fee > 0): ?>
+                                                    <span class="text-warning"><?php echo $account['currency']; ?> <?php echo number_format($challenge_fee, 2); ?></span>
+                                                <?php else: ?>
+                                                    <span class="text-muted">-</span>
+                                                <?php endif; ?>
+                                            </td>
+                                            <td><?php echo $account['currency']; ?> <?php echo number_format($account['current_balance'], 2); ?></td>
+                                            <td class="<?php echo $account_pl >= 0 ? 'text-success' : 'text-danger'; ?>">
+                                                <?php echo $account_pl >= 0 ? '+' : ''; ?><?php echo $account['currency']; ?> <?php echo number_format($account_pl, 2); ?>
+                                            </td>
+                                            <td>
+                                                <?php
+                                                $status_class = 'secondary';
+                                                if ($account['status'] === 'active') $status_class = 'success';
+                                                elseif ($account['status'] === 'ongoing') $status_class = 'info';
+                                                elseif ($account['status'] === 'breach') $status_class = 'danger';
+                                                elseif ($account['status'] === 'closed') $status_class = 'warning';
+                                                ?>
+                                                <span class="badge bg-<?php echo $status_class; ?>">
+                                                    <?php echo ucfirst($account['status']); ?>
+                                                </span>
+                                            </td>
+                                            <td><?php echo date('M d, Y', strtotime($account['created_at'])); ?></td>
+                                        </tr>
+                                    <?php endforeach; endif; ?>
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+        </div>
+        
+        <!-- Motivational Quote -->
+        <div class="motivation-card">
+            <div class="motivation-quote" id="motivationQuote">
+                <?php echo htmlspecialchars($random_quote); ?>
+            </div>
+            <div class="motivation-author">— Trading Wisdom</div>
+            <button class="btn-refresh-quote" onclick="changeQuote()">
+                <i class="fas fa-sync-alt me-2"></i>New Quote
+            </button>
+        </div>
     </main>
-
+    
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
     <script>
-        // Toggle calculator dropdown
-        function toggleCalculatorDropdown(event) {
-            if (event) {
-                event.preventDefault();
-                event.stopPropagation();
-            }
-            const dropdown = document.getElementById('calculatorDropdown');
-            const dropdownParent = dropdown ? dropdown.closest('.calculator-dropdown') : null;
-            if (dropdown && dropdownParent) {
-                dropdown.classList.toggle('show');
-                dropdownParent.classList.toggle('active');
-            }
+        // Motivational Quotes
+        const quotes = <?php echo json_encode($quotes); ?>;
+        
+        function changeQuote() {
+            const randomQuote = quotes[Math.floor(Math.random() * quotes.length)];
+            const quoteElement = document.getElementById('motivationQuote');
+            quoteElement.style.opacity = '0';
+            setTimeout(() => {
+                quoteElement.textContent = randomQuote;
+                quoteElement.style.opacity = '1';
+            }, 300);
         }
         
-        // Close dropdown when clicking outside
-        document.addEventListener('click', function(event) {
-            const dropdown = document.getElementById('calculatorDropdown');
-            const dropdownParent = dropdown ? dropdown.closest('.calculator-dropdown') : null;
-            if (dropdown && dropdownParent && !event.target.closest('.calculator-dropdown')) {
-                dropdown.classList.remove('show');
-                dropdownParent.classList.remove('active');
-            }
-        });
+        // Account Type Chart
+        <?php if (!empty($account_types)): ?>
+        const accountTypeCtx = document.getElementById('accountTypeChart');
+        if (accountTypeCtx) {
+            new Chart(accountTypeCtx, {
+                type: 'doughnut',
+                data: {
+                    labels: <?php echo json_encode(array_map(function($t) { return ucfirst($t['account_type']); }, $account_types)); ?>,
+                    datasets: [{
+                        data: <?php echo json_encode(array_column($account_types, 'count')); ?>,
+                        backgroundColor: [
+                            'rgba(59, 130, 246, 0.8)',
+                            'rgba(168, 85, 247, 0.8)',
+                            'rgba(16, 185, 129, 0.8)',
+                            'rgba(245, 158, 11, 0.8)',
+                            'rgba(148, 163, 184, 0.8)'
+                        ],
+                        borderColor: [
+                            '#3b82f6',
+                            '#a855f7',
+                            '#10b981',
+                            '#f59e0b',
+                            '#94a3b8'
+                        ],
+                        borderWidth: 2
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: {
+                        legend: {
+                            position: 'bottom',
+                            labels: {
+                                color: '#94a3b8',
+                                padding: 15
+                            }
+                        }
+                    }
+                }
+            });
+        }
+        <?php endif; ?>
         
+        // Status Chart
+        <?php if (!empty($status_breakdown)): ?>
+        const statusCtx = document.getElementById('statusChart');
+        if (statusCtx) {
+            new Chart(statusCtx, {
+                type: 'bar',
+                data: {
+                    labels: <?php echo json_encode(array_map(function($s) { return ucfirst($s['status']); }, $status_breakdown)); ?>,
+                    datasets: [{
+                        label: 'Account Count',
+                        data: <?php echo json_encode(array_column($status_breakdown, 'count')); ?>,
+                        backgroundColor: [
+                            'rgba(16, 185, 129, 0.8)',   // active
+                            'rgba(59, 130, 246, 0.8)',   // ongoing
+                            'rgba(239, 68, 68, 0.8)',    // breach
+                            'rgba(148, 163, 184, 0.8)',  // inactive
+                            'rgba(245, 158, 11, 0.8)'    // closed
+                        ],
+                        borderColor: [
+                            '#10b981',
+                            '#3b82f6',
+                            '#ef4444',
+                            '#94a3b8',
+                            '#f59e0b'
+                        ],
+                        borderWidth: 2
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: {
+                        legend: {
+                            display: false
+                        }
+                    },
+                    scales: {
+                        y: {
+                            beginAtZero: true,
+                            ticks: {
+                                color: '#94a3b8',
+                                stepSize: 1
+                            },
+                            grid: {
+                                color: '#334155'
+                            }
+                        },
+                        x: {
+                            ticks: {
+                                color: '#94a3b8'
+                            },
+                            grid: {
+                                color: '#334155'
+                            }
+                        }
+                    }
+                }
+            });
+        }
+        <?php endif; ?>
+        
+        // Sidebar toggle functionality
         function toggleSidebar() {
             const sidebar = document.getElementById('sidebar');
-            const toggleBtn = document.getElementById('sidebarToggleBtn');
             const mainContent = document.querySelector('.main-content');
             
-            if (!sidebar) return;
-            
-            const isClosed = sidebar.classList.contains('closed');
-            
-            if (isClosed) {
-                sidebar.classList.remove('closed');
-                sidebar.classList.add('show');
-                sidebar.style.transform = 'translateX(0)';
-                
-                if (mainContent) {
-                    if (window.innerWidth > 768) {
-                        mainContent.style.marginLeft = '280px';
-                        mainContent.style.transition = 'margin-left 0.3s ease';
-                    } else {
+            if (sidebar) {
+                sidebar.classList.toggle('closed');
+                if (window.innerWidth > 768) {
+                    if (sidebar.classList.contains('closed')) {
                         mainContent.style.marginLeft = '0';
+                    } else {
+                        mainContent.style.marginLeft = '280px';
                     }
-                }
-                
-                if (toggleBtn) {
-                    toggleBtn.classList.remove('show');
-                    toggleBtn.style.display = 'none';
-                }
-            } else {
-                sidebar.classList.add('closed');
-                sidebar.classList.remove('show');
-                sidebar.style.transform = 'translateX(-100%)';
-                
-                if (mainContent) {
-                    mainContent.style.marginLeft = '0';
-                    mainContent.style.transition = 'margin-left 0.3s ease';
-                }
-                
-                if (toggleBtn) {
-                    toggleBtn.classList.add('show');
-                    toggleBtn.style.display = 'block';
                 }
             }
         }
-        
-        document.addEventListener('DOMContentLoaded', function() {
-            const sidebar = document.getElementById('sidebar');
-            const toggleBtn = document.getElementById('sidebarToggleBtn');
-            const mainContent = document.querySelector('.main-content');
-            const closeBtn = document.querySelector('.sidebar-close');
-            
-            if (closeBtn) {
-                closeBtn.style.display = 'flex';
-                closeBtn.style.visibility = 'visible';
-                closeBtn.style.opacity = '1';
-                
-                const icon = closeBtn.querySelector('i.fa-angle-left');
-                if (icon) {
-                    setTimeout(function() {
-                        const testEl = document.createElement('i');
-                        testEl.className = 'fas fa-check';
-                        document.body.appendChild(testEl);
-                        const fontFamily = window.getComputedStyle(testEl, ':before').getPropertyValue('font-family');
-                        document.body.removeChild(testEl);
-                        
-                        if (fontFamily && fontFamily.includes('Font Awesome')) {
-                            closeBtn.classList.add('show-icon');
-                        }
-                    }, 100);
-                }
-            }
-            
-            if (window.innerWidth > 768) {
-                sidebar.classList.remove('closed');
-                sidebar.classList.add('show');
-                sidebar.style.transform = 'translateX(0)';
-                if (mainContent) {
-                    mainContent.style.marginLeft = '280px';
-                    mainContent.style.transition = 'margin-left 0.3s ease';
-                }
-                if (toggleBtn) {
-                    toggleBtn.classList.remove('show');
-                    toggleBtn.style.display = 'none';
-                }
-            } else {
-                sidebar.classList.add('closed');
-                sidebar.classList.remove('show');
-                sidebar.style.transform = 'translateX(-100%)';
-                if (mainContent) {
-                    mainContent.style.marginLeft = '0';
-                    mainContent.style.transition = 'margin-left 0.3s ease';
-                }
-                if (toggleBtn) {
-                    toggleBtn.classList.add('show');
-                    toggleBtn.style.display = 'block';
-                }
-            }
-            
-            window.addEventListener('resize', function() {
-                if (window.innerWidth > 768) {
-                    if (!sidebar.classList.contains('closed')) {
-                        sidebar.classList.add('show');
-                        sidebar.style.transform = 'translateX(0)';
-                        if (mainContent) {
-                            mainContent.style.marginLeft = '280px';
-                            mainContent.style.transition = 'margin-left 0.3s ease';
-                        }
-                    }
-                    if (toggleBtn) {
-                        toggleBtn.style.display = 'none';
-                    }
-                } else {
-                    sidebar.classList.add('closed');
-                    sidebar.classList.remove('show');
-                    sidebar.style.transform = 'translateX(-100%)';
-                    if (mainContent) {
-                        mainContent.style.marginLeft = '0';
-                        mainContent.style.transition = 'margin-left 0.3s ease';
-                    }
-                    if (toggleBtn) {
-                        toggleBtn.classList.add('show');
-                        toggleBtn.style.display = 'block';
-                    }
-                }
-            });
-            
-            // Highlight active sidebar link
-            const currentPage = window.location.pathname.split('/').pop();
-            const sidebarLinks = document.querySelectorAll('.sidebar .nav-link');
-            
-            sidebarLinks.forEach(link => {
-                const href = link.getAttribute('href');
-                if (href && (href === currentPage || href.includes(currentPage))) {
-                    link.classList.add('active');
-                } else {
-                    link.classList.remove('active');
-                }
-            });
-        });
-        
-        document.addEventListener('click', function(event) {
-            const sidebar = document.getElementById('sidebar');
-            const toggleBtn = document.getElementById('sidebarToggleBtn');
-            const isClickInsideSidebar = sidebar.contains(event.target);
-            const isClickOnToggleBtn = toggleBtn && toggleBtn.contains(event.target);
-            
-            if (window.innerWidth <= 768 && !isClickInsideSidebar && !isClickOnToggleBtn && !sidebar.classList.contains('closed')) {
-                sidebar.classList.add('closed');
-                if (toggleBtn) {
-                    toggleBtn.innerHTML = '<i class="fas fa-bars"></i>';
-                    toggleBtn.title = 'Open Sidebar';
-                }
-            }
-        });
     </script>
 </body>
 </html>
+

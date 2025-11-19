@@ -4,7 +4,7 @@ require_once __DIR__.'/../config/database.php';
 // डाटाबेसबाट कोर्सहरू फेच गर्ने
 try {
     $stmt = $pdo->query("SELECT * FROM courses WHERE is_free = 1 ORDER BY created_at DESC");
-    $courses = $stmt->fetchAll();
+    $courses = $stmt->fetchAll(PDO::FETCH_ASSOC);
 } catch (PDOException $e) {
     die("कोर्स फेच गर्दा त्रुटि: " . $e->getMessage());
 }

@@ -4,18 +4,24 @@ session_start();
 
 // युजर लगइन जाँच
 if (!isset($_SESSION['user_id'])) {
-    header("Location: /login.php");
+    header("Location: ../login.php");
     exit();
 }
 
 // कोर्स डाटा फेच गर्ने
-$course_id = $_GET['course_id'];
+if (!isset($_GET['course_id']) || empty($_GET['course_id'])) {
+    header("Location: ../course/course.php");
+    exit();
+}
+
+$course_id = intval($_GET['course_id']);
 $stmt = $pdo->prepare("SELECT * FROM courses WHERE id = ?");
 $stmt->execute([$course_id]);
-$course = $stmt->fetch();
+$course = $stmt->fetch(PDO::FETCH_ASSOC);
 
 if (!$course) {
-    die("कोर्स फेला परेन");
+    header("Location: ../course/course.php");
+    exit();
 }
 ?>
 
@@ -24,20 +30,21 @@ if (!$course) {
 <script>
     var config = {
         "publicKey": "test_public_key_...",
-        "productIdentity": "<?= $course['id'] ?>",
-        "productName": "<?= $course['title'] ?>",
+        "productIdentity": "<?= htmlspecialchars($course['id'], ENT_QUOTES, 'UTF-8'); ?>",
+        "productName": "<?= htmlspecialchars($course['title'], ENT_QUOTES, 'UTF-8'); ?>",
         "productUrl": window.location.href,
         "paymentPreference": ["KHALTI"],
         "eventHandler": {
             onSuccess(payload) {
                 // सफल भुक्तानी पछिको प्रक्रिया
-                window.location.href = `/payment/success.php?token=${payload.token}`;
+                window.location.href = "../payment/success.php?token=" + encodeURIComponent(payload.token);
             },
             onError(error) {
                 console.log(error);
+                alert("Payment failed. Please try again.");
             }
         }
     };
     var checkout = new KhaltiCheckout(config);
 </script>
-<button onclick="checkout.show({amount: <?= $course['price'] * 100 ?>})">खाल्टीमा पेमेन्ट गर्नुहोस्</button>
+<button onclick="checkout.show({amount: <?= intval($course['price'] * 100); ?>})">खाल्टीमा पेमेन्ट गर्नुहोस्</button>

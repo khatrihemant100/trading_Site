@@ -405,6 +405,9 @@ function sendQuickMessage(message) {
     sendMessage(new Event('submit'));
 }
 
+// Store conversation history
+let conversationHistory = [];
+
 function sendMessage(event) {
     event.preventDefault();
     
@@ -415,31 +418,49 @@ function sendMessage(event) {
     
     // Add user message to chat
     addMessage(message, 'user');
+    conversationHistory.push({role: 'user', content: message});
     input.value = '';
     
     // Show typing indicator
     showTypingIndicator();
     
+    // Determine the correct path to ai-chat.php based on current location
+    const currentPath = window.location.pathname;
+    let chatApiPath = 'ai-chat.php';
+    
+    // If we're in dashboard folder, go up one level
+    if (currentPath.includes('/dashboard/')) {
+        chatApiPath = '../ai-chat.php';
+    }
+    
     // Send to AI
-    fetch('ai-chat.php', {
+    fetch(chatApiPath, {
         method: 'POST',
         headers: {
             'Content-Type': 'application/x-www-form-urlencoded',
         },
         body: `action=get_response&message=${encodeURIComponent(message)}`
     })
-    .then(response => response.json())
+    .then(response => {
+        if (!response.ok) {
+            throw new Error('Network response was not ok');
+        }
+        return response.json();
+    })
     .then(data => {
         hideTypingIndicator();
         if (data.status === 'success') {
             addMessage(data.response, 'ai');
+            conversationHistory.push({role: 'assistant', content: data.response});
         } else {
-            addMessage('Sorry, I encountered an error. Please try again.', 'ai');
+            const errorMsg = data.response || 'Sorry, I encountered an error. Please try again.';
+            addMessage(errorMsg, 'ai');
         }
     })
     .catch(error => {
         hideTypingIndicator();
-        addMessage('Sorry, I\'m having trouble connecting. Please try again later.', 'ai');
+        console.error('Error:', error);
+        addMessage('Sorry, I\'m having trouble connecting. Please check your internet connection and try again later.', 'ai');
     });
 }
 
@@ -454,7 +475,15 @@ function addMessage(text, type) {
     
     const content = document.createElement('div');
     content.className = 'message-content';
-    content.innerHTML = `<p>${text.replace(/\n/g, '<br>')}</p>`;
+    // Escape HTML and preserve line breaks
+    const escapedText = text
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;')
+        .replace(/"/g, '&quot;')
+        .replace(/'/g, '&#039;')
+        .replace(/\n/g, '<br>');
+    content.innerHTML = `<p>${escapedText}</p>`;
     
     messageDiv.appendChild(avatar);
     messageDiv.appendChild(content);
@@ -469,7 +498,9 @@ function addMessage(text, type) {
     }
     
     // Scroll to bottom
-    chatBody.scrollTop = chatBody.scrollHeight;
+    setTimeout(() => {
+        chatBody.scrollTop = chatBody.scrollHeight;
+    }, 100);
 }
 
 function showTypingIndicator() {

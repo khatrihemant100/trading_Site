@@ -19,6 +19,60 @@ try {
         header("Location: ../logout.php");
         exit();
     }
+    
+    // Fetch user's withdrawal history
+    try {
+        // Create withdrawals table if it doesn't exist
+        $pdo->exec("
+            CREATE TABLE IF NOT EXISTS account_withdrawals (
+                id INT AUTO_INCREMENT PRIMARY KEY,
+                user_id INT NOT NULL,
+                account_id INT NULL,
+                withdrawal_amount DECIMAL(15,2) NOT NULL,
+                currency VARCHAR(10) DEFAULT 'USD',
+                platform ENUM('rise','bank','crypto','other') NOT NULL,
+                platform_details VARCHAR(255) DEFAULT NULL,
+                withdrawal_date DATE NOT NULL,
+                notes TEXT DEFAULT NULL,
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+                FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE,
+                FOREIGN KEY (account_id) REFERENCES trading_accounts(id) ON DELETE SET NULL
+            ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+        ");
+    } catch (PDOException $e) {
+        // Table might already exist, continue
+    }
+    
+    // Fetch all withdrawals with account names
+    $withdrawals_stmt = $pdo->prepare("
+        SELECT w.*, a.account_name, a.account_type 
+        FROM account_withdrawals w
+        LEFT JOIN trading_accounts a ON w.account_id = a.id
+        WHERE w.user_id = ?
+        ORDER BY w.withdrawal_date DESC, w.created_at DESC
+    ");
+    $withdrawals_stmt->execute([$_SESSION['user_id']]);
+    $withdrawals = $withdrawals_stmt->fetchAll(PDO::FETCH_ASSOC);
+    
+    // Calculate total withdrawals
+    $total_withdrawals = array_sum(array_column($withdrawals, 'withdrawal_amount'));
+    
+    // Withdrawals by platform
+    $withdrawals_by_platform = [];
+    foreach ($withdrawals as $w) {
+        $platform = $w['platform'];
+        if (!isset($withdrawals_by_platform[$platform])) {
+            $withdrawals_by_platform[$platform] = [
+                'count' => 0,
+                'total' => 0,
+                'platform' => $platform
+            ];
+        }
+        $withdrawals_by_platform[$platform]['count']++;
+        $withdrawals_by_platform[$platform]['total'] += floatval($w['withdrawal_amount']);
+    }
+    
 } catch (PDOException $e) {
     die("डाटाबेस त्रुटि: " . $e->getMessage());
 }
@@ -354,13 +408,13 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action'])) {
                         <li class="nav-item">
                             <a class="nav-link <?php echo $active_tab === 'profile' ? 'active' : ''; ?>" 
                                data-bs-toggle="pill" href="#profile-tab">
-                                <i class="fas fa-user me-2"></i>प्रोफाइल जानकारी
+                                <i class="fas fa-user me-2"></i>Profile Information
                             </a>
                         </li>
                         <li class="nav-item">
                             <a class="nav-link <?php echo $active_tab === 'settings' ? 'active' : ''; ?>" 
                                data-bs-toggle="pill" href="#settings-tab">
-                                <i class="fas fa-cog me-2"></i>सेटिङहरू
+                                <i class="fas fa-cog me-2"></i>Settings
                             </a>
                         </li>
                     </ul>
@@ -421,36 +475,37 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action'])) {
                     <div class="tab-pane fade <?php echo $active_tab === 'settings' ? 'show active' : ''; ?>" id="settings-tab">
                         <div class="profile-card">
                             <h5 class="fw-bold mb-4">
-                                <i class="fas fa-cog me-2"></i>सेटिङहरू
+                                <i class="fas fa-cog me-2"></i>Settings
                             </h5>
                             
-                            <h6 class="fw-bold mb-3">पासवर्ड परिवर्तन गर्नुहोस्</h6>
+                            <h6 class="fw-bold mb-3">Change Password</h6>
                             <form method="POST">
                                 <input type="hidden" name="action" value="change_password">
                                 
                                 <div class="mb-3">
-                                    <label class="form-label info-label">हालको पासवर्ड</label>
+                                    <label class="form-label info-label">Current Password</label>
                                     <input type="password" class="form-control" name="current_password" required>
                                 </div>
                                 
                                 <div class="mb-3">
-                                    <label class="form-label info-label">नयाँ पासवर्ड</label>
+                                    <label class="form-label info-label">New Password</label>
                                     <input type="password" class="form-control" name="new_password" 
                                            minlength="6" required>
-                                    <small class="text-muted">कम्तिमा ६ अक्षरको हुनुपर्छ</small>
+                                    <small class="text-muted">Minimum 6 characters required</small>
                                 </div>
                                 
                                 <div class="mb-3">
-                                    <label class="form-label info-label">पासवर्ड पुष्टि गर्नुहोस्</label>
+                                    <label class="form-label info-label">Confirm Password</label>
                                     <input type="password" class="form-control" name="confirm_password" required>
                                 </div>
                                 
                                 <button type="submit" class="btn btn-warning">
-                                    <i class="fas fa-key me-2"></i>पासवर्ड परिवर्तन गर्नुहोस्
+                                    <i class="fas fa-key me-2"></i>Change Password
                                 </button>
                             </form>
                         </div>
                     </div>
+                    
                 </div>
             </div>
         </div>

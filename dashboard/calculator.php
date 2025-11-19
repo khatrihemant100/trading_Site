@@ -24,7 +24,7 @@ try {
 }
 
 // Get selected calculator type
-$calc_type = isset($_GET['type']) ? $_GET['type'] : 'position';
+$calc_type = isset($_GET['type']) ? $_GET['type'] : 'lot-size';
 ?>
 
 <!DOCTYPE html>
@@ -60,7 +60,7 @@ $calc_type = isset($_GET['type']) ? $_GET['type'] : 'position';
             overflow-x: hidden;
         }
         
-        /* Sidebar */
+        /* Sidebar Styles - Same as dashboard */
         .sidebar {
             position: fixed !important;
             left: 0;
@@ -166,23 +166,6 @@ $calc_type = isset($_GET['type']) ? $_GET['type'] : 'position';
             padding: 0;
         }
         
-        .sidebar-close i.fa-angle-left {
-            display: none !important;
-        }
-        
-        .sidebar-close.show-icon i.fa-angle-left {
-            display: inline-block !important;
-        }
-        
-        .sidebar-close.show-icon .close-arrow {
-            display: none !important;
-        }
-        
-        .sidebar.closed .sidebar-close i {
-            transform: rotate(180deg);
-        }
-        
-        /* Sidebar Toggle Button */
         .sidebar-toggle-btn {
             position: fixed !important;
             left: 20px !important;
@@ -203,7 +186,6 @@ $calc_type = isset($_GET['type']) ? $_GET['type'] : 'position';
         .sidebar-toggle-btn:hover {
             background: #059669 !important;
             transform: scale(1.1);
-            box-shadow: 0 6px 16px rgba(16, 185, 129, 0.6);
         }
         
         .sidebar-toggle-btn.show {
@@ -273,7 +255,6 @@ $calc_type = isset($_GET['type']) ? $_GET['type'] : 'position';
             color: #ffffff !important;
             font-weight: 600;
             box-shadow: 0 4px 16px rgba(16, 185, 129, 0.4);
-            transform: translateX(0);
         }
         
         .nav-link.active::before {
@@ -284,17 +265,6 @@ $calc_type = isset($_GET['type']) ? $_GET['type'] : 'position';
         .nav-link i {
             width: 20px;
             text-align: center;
-            color: var(--text-primary);
-            transition: all 0.3s;
-        }
-        
-        .nav-link:hover i {
-            color: var(--primary);
-            transform: scale(1.2);
-        }
-        
-        .nav-link.active i {
-            color: #ffffff !important;
         }
         
         /* Main Content */
@@ -326,109 +296,116 @@ $calc_type = isset($_GET['type']) ? $_GET['type'] : 'position';
             color: var(--text-secondary) !important;
             font-weight: 500;
             margin: 0 0.5rem;
-            transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+            transition: all 0.3s;
             padding: 8px 16px;
             border-radius: 6px;
-            position: relative;
         }
         
         .top-navbar .nav-link:hover {
             background-color: var(--primary) !important;
             color: #ffffff !important;
-            transform: translateY(-2px);
         }
         
         .top-navbar .nav-link.active {
             background-color: var(--primary) !important;
             color: #ffffff !important;
-            box-shadow: 0 4px 12px rgba(16, 185, 129, 0.3);
         }
         
-        /* Calculator Dropdown in Sidebar */
-        .calculator-dropdown {
-            position: relative;
+        /* Calculator Container */
+        .calculator-container {
+            max-width: 1200px;
+            margin: 0 auto;
         }
         
-        .calculator-dropdown-btn {
-            background: none !important;
-            border: none !important;
-            width: 100%;
-            text-align: left;
+        .calculator-header {
+            text-align: center;
+            margin-bottom: 40px;
+        }
+        
+        .calculator-main-title {
+            font-size: 2.5rem;
+            font-weight: 700;
+            color: var(--text-primary);
+            margin-bottom: 10px;
+        }
+        
+        .calculator-description {
+            color: var(--text-secondary);
+            font-size: 1rem;
+            max-width: 700px;
+            margin: 0 auto;
+        }
+        
+        /* Calculator Tabs */
+        .calculator-tabs {
+            display: flex;
+            gap: 10px;
+            margin-bottom: 30px;
+            border-bottom: 2px solid var(--border-color);
+            padding-bottom: 0;
+            flex-wrap: wrap;
+        }
+        
+        .calculator-tab {
+            padding: 12px 24px;
+            background: none;
+            border: none;
+            color: var(--text-secondary);
+            font-weight: 500;
+            font-size: 0.95rem;
             cursor: pointer;
+            transition: all 0.3s;
+            position: relative;
             display: flex;
             align-items: center;
-            gap: 12px;
-            padding: 10px 14px;
-            color: var(--text-primary) !important;
-            font-weight: 500;
-            font-size: 0.9rem;
-            transition: all 0.3s;
+            gap: 8px;
+            border-bottom: 3px solid transparent;
+            margin-bottom: -2px;
         }
         
-        .calculator-dropdown-btn i.fa-chevron-down {
-            margin-left: auto;
-            transition: transform 0.3s;
-        }
-        
-        .calculator-dropdown-btn:hover {
-            background-color: var(--dark-hover) !important;
-            color: var(--text-primary) !important;
-        }
-        
-        .calculator-dropdown.active .calculator-dropdown-btn i.fa-chevron-down {
-            transform: rotate(180deg);
-        }
-        
-        .calculator-dropdown-menu {
-            display: none;
-            background-color: var(--dark-bg);
-            border-left: 3px solid var(--primary);
-            margin-left: 20px;
-            margin-top: 5px;
-            margin-bottom: 8px;
-            border-radius: 0 8px 8px 0;
-            overflow: hidden;
-        }
-        
-        .calculator-dropdown-menu.show {
-            display: block;
-        }
-        
-        .calculator-dropdown-item {
-            display: block;
-            padding: 10px 20px;
-            color: var(--text-secondary);
-            text-decoration: none;
-            transition: all 0.3s;
-            font-size: 0.85rem;
-            border-bottom: 1px solid var(--border-color);
-        }
-        
-        .calculator-dropdown-item:last-child {
-            border-bottom: none;
-        }
-        
-        .calculator-dropdown-item:hover {
-            background-color: var(--dark-hover);
+        .calculator-tab:hover {
             color: var(--primary);
-            padding-left: 25px;
-        }
-        
-        .calculator-dropdown-item.active {
             background-color: rgba(16, 185, 129, 0.1);
+        }
+        
+        .calculator-tab.active {
             color: var(--primary);
+            border-bottom-color: var(--primary);
             font-weight: 600;
-            border-left: 3px solid var(--primary);
+        }
+        
+        .calculator-tab i {
+            font-size: 1.1rem;
         }
         
         /* Calculator Card */
         .calculator-card {
             background-color: var(--dark-card);
             border: 1px solid var(--border-color);
-            border-radius: 12px;
-            padding: 30px;
-            margin-top: 30px;
-            box-shadow: 0 4px 16px rgba(0, 0, 0, 0.2);
+            border-radius: 16px;
+            padding: 40px;
+            box-shadow: 0 8px 24px rgba(0, 0, 0, 0.3);
+            margin-bottom: 30px;
+        }
+        
+        .calculator-content {
+            display: none;
+        }
+        
+        .calculator-content.active {
+            display: block;
+            animation: fadeIn 0.3s ease-in;
+        }
+        
+        @keyframes fadeIn {
+            from {
+                opacity: 0;
+                transform: translateY(10px);
+            }
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
         }
         
         .calculator-title {
@@ -441,20 +418,32 @@ $calc_type = isset($_GET['type']) ? $_GET['type'] : 'position';
         .calculator-subtitle {
             color: var(--text-secondary);
             margin-bottom: 30px;
+            font-size: 0.95rem;
         }
         
+        /* Form Styles */
         .form-label {
             color: var(--text-secondary);
             font-weight: 500;
             margin-bottom: 8px;
+            display: flex;
+            align-items: center;
+            gap: 6px;
+        }
+        
+        .form-label .info-icon {
+            color: var(--primary);
+            cursor: help;
+            font-size: 0.9rem;
         }
         
         .form-control, .form-select {
             background-color: var(--dark-bg);
             border: 1px solid var(--border-color);
             color: var(--text-primary);
-            padding: 10px 15px;
+            padding: 12px 15px;
             border-radius: 8px;
+            transition: all 0.3s;
         }
         
         .form-control:focus, .form-select:focus {
@@ -462,46 +451,85 @@ $calc_type = isset($_GET['type']) ? $_GET['type'] : 'position';
             border-color: var(--primary);
             color: var(--text-primary);
             box-shadow: 0 0 0 0.25rem rgba(16, 185, 129, 0.25);
+            outline: none;
         }
         
-        .btn-primary {
-            background-color: var(--primary);
-            border-color: var(--primary);
-            padding: 12px 30px;
+        .form-control::placeholder {
+            color: var(--text-secondary);
+            opacity: 0.6;
+        }
+        
+        .btn-calculate {
+            background: linear-gradient(135deg, var(--primary) 0%, var(--primary-dark) 100%);
+            border: none;
+            color: white;
+            padding: 14px 40px;
             font-weight: 600;
             border-radius: 8px;
+            font-size: 1rem;
+            cursor: pointer;
+            transition: all 0.3s;
+            width: 100%;
+            margin-top: 10px;
         }
         
-        .btn-primary:hover {
-            background-color: var(--primary-dark);
-            border-color: var(--primary-dark);
+        .btn-calculate:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 8px 20px rgba(16, 185, 129, 0.4);
+        }
+        
+        /* Result Box */
+        .result-container {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 30px;
+            margin-top: 30px;
         }
         
         .result-box {
-            background: linear-gradient(135deg, rgba(16, 185, 129, 0.1) 0%, rgba(5, 150, 105, 0.1) 100%);
+            background: linear-gradient(135deg, rgba(16, 185, 129, 0.1) 0%, rgba(5, 150, 105, 0.05) 100%);
             border: 2px solid var(--primary);
             border-radius: 12px;
-            padding: 20px;
-            margin-top: 20px;
-            display: none;
-        }
-        
-        .result-box.show {
-            display: block;
+            padding: 30px;
+            text-align: center;
+            min-height: 200px;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
         }
         
         .result-label {
             color: var(--text-secondary);
             font-size: 0.9rem;
-            margin-bottom: 5px;
+            margin-bottom: 10px;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
         }
         
         .result-value {
             color: var(--primary);
-            font-size: 2rem;
+            font-size: 2.5rem;
             font-weight: 700;
         }
         
+        /* Disclaimer */
+        .disclaimer-box {
+            background-color: rgba(139, 92, 246, 0.1);
+            border: 1px solid rgba(139, 92, 246, 0.3);
+            border-radius: 12px;
+            padding: 20px;
+            color: var(--text-secondary);
+            font-size: 0.9rem;
+            line-height: 1.6;
+            margin-top: 30px;
+        }
+        
+        .disclaimer-box strong {
+            color: var(--text-primary);
+        }
+        
+        /* Responsive */
         @media (max-width: 768px) {
             .sidebar {
                 transform: translateX(-100%);
@@ -517,10 +545,34 @@ $calc_type = isset($_GET['type']) ? $_GET['type'] : 'position';
             
             .main-content {
                 margin-left: 0;
+                padding: 20px;
             }
             
             .sidebar-toggle-btn {
                 display: block !important;
+            }
+            
+            .calculator-tabs {
+                overflow-x: auto;
+                flex-wrap: nowrap;
+            }
+            
+            .calculator-tab {
+                white-space: nowrap;
+                font-size: 0.85rem;
+                padding: 10px 16px;
+            }
+            
+            .calculator-card {
+                padding: 25px;
+            }
+            
+            .result-container {
+                grid-template-columns: 1fr;
+            }
+            
+            .calculator-main-title {
+                font-size: 2rem;
             }
         }
         
@@ -536,6 +588,47 @@ $calc_type = isset($_GET['type']) ? $_GET['type'] : 'position';
             .sidebar.show ~ .main-content {
                 margin-left: 0;
             }
+        }
+        
+        .user-info {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+        }
+        
+        .user-avatar {
+            width: 40px;
+            height: 40px;
+            border-radius: 50%;
+            background: linear-gradient(135deg, var(--primary) 0%, var(--primary-dark) 100%);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: white;
+            font-weight: 600;
+            overflow: hidden;
+        }
+        
+        .user-avatar img {
+            width: 100%;
+            height: 100%;
+            object-fit: cover;
+        }
+        
+        .user-details {
+            display: flex;
+            flex-direction: column;
+        }
+        
+        .user-name {
+            font-weight: 600;
+            color: var(--text-primary);
+            font-size: 0.9rem;
+        }
+        
+        .user-id {
+            font-size: 0.75rem;
+            color: var(--text-secondary);
         }
     </style>
 </head>
@@ -611,7 +704,7 @@ $calc_type = isset($_GET['type']) ? $_GET['type'] : 'position';
                 </div>
                 <span>NpLTrader</span>
             </div>
-            <button class="sidebar-close" onclick="toggleSidebar()" title="Close Sidebar" aria-label="Close Sidebar">
+            <button class="sidebar-close" onclick="toggleSidebar()" title="Close Sidebar">
                 <i class="fas fa-angle-left"></i>
                 <span class="close-arrow">←</span>
             </button>
@@ -648,26 +741,11 @@ $calc_type = isset($_GET['type']) ? $_GET['type'] : 'position';
                     <span>Mindset</span>
                 </a>
             </li>
-            <li class="nav-item calculator-dropdown">
-                <button class="nav-link calculator-dropdown-btn" onclick="toggleCalculatorDropdown(event)" style="width: 100%; text-align: left; background: none; border: none;">
+            <li class="nav-item">
+                <a href="calculator.php" class="nav-link active">
                     <i class="fas fa-calculator"></i>
                     <span>Calculators</span>
-                    <i class="fas fa-chevron-down ms-auto" style="margin-left: auto;"></i>
-                </button>
-                <div class="calculator-dropdown-menu" id="calculatorDropdown">
-                    <a href="calculator.php?type=position" class="calculator-dropdown-item <?php echo $calc_type === 'position' ? 'active' : ''; ?>">
-                        Position Sizing Calculator
-                    </a>
-                    <a href="calculator.php?type=compound" class="calculator-dropdown-item <?php echo $calc_type === 'compound' ? 'active' : ''; ?>">
-                        Compound Interest Calculator
-                    </a>
-                    <a href="calculator.php?type=emi" class="calculator-dropdown-item <?php echo $calc_type === 'emi' ? 'active' : ''; ?>">
-                        EMI calculator
-                    </a>
-                    <a href="calculator.php?type=sip" class="calculator-dropdown-item <?php echo $calc_type === 'sip' ? 'active' : ''; ?>">
-                        SIP Calculator
-                    </a>
-                </div>
+                </a>
             </li>
         </ul>
         
@@ -697,180 +775,394 @@ $calc_type = isset($_GET['type']) ? $_GET['type'] : 'position';
 
     <!-- Main Content -->
     <main class="main-content">
-        <div class="calculator-card">
-            <?php if ($calc_type === 'position'): ?>
-                <h2 class="calculator-title">Position Sizing Calculator</h2>
-                <p class="calculator-subtitle">Calculate the optimal position size based on your risk tolerance</p>
-                
-                <form id="positionCalculator">
-                    <div class="row">
-                        <div class="col-md-6 mb-3">
-                            <label class="form-label">Account Balance (रु)</label>
-                            <input type="number" class="form-control" id="accountBalance" step="0.01" min="0" required>
+        <div class="calculator-container">
+            <!-- Header -->
+            <div class="calculator-header">
+                <h1 class="calculator-main-title">Lot Size Calculator</h1>
+                <p class="calculator-description">
+                    Our FundedNext Lot Size Calculator allows you to calculate the optimal lot size for your trades. 
+                    This tool helps you manage risk effectively by determining position size that aligns with your trading plan for your trades.
+                </p>
+            </div>
+
+            <!-- Calculator Tabs -->
+            <div class="calculator-tabs">
+                <button class="calculator-tab <?php echo $calc_type === 'margin' ? 'active' : ''; ?>" onclick="switchCalculator('margin')">
+                    <i class="fas fa-chart-line"></i>
+                    <span>Margin Calculator</span>
+                </button>
+                <button class="calculator-tab <?php echo $calc_type === 'profit-loss' ? 'active' : ''; ?>" onclick="switchCalculator('profit-loss')">
+                    <i class="fas fa-clock"></i>
+                    <span>Profit/Loss Calculator</span>
+                </button>
+                <button class="calculator-tab <?php echo $calc_type === 'lot-size' ? 'active' : ''; ?>" onclick="switchCalculator('lot-size')">
+                    <i class="fas fa-chart-bar"></i>
+                    <span>Lot Size Calculator</span>
+                </button>
+                <button class="calculator-tab <?php echo $calc_type === 'swap' ? 'active' : ''; ?>" onclick="switchCalculator('swap')">
+                    <i class="fas fa-exchange-alt"></i>
+                    <span>Swap Calculator</span>
+                </button>
+            </div>
+
+            <!-- Calculator Card -->
+            <div class="calculator-card">
+                <!-- Margin Calculator -->
+                <div class="calculator-content <?php echo $calc_type === 'margin' ? 'active' : ''; ?>" id="margin-calc">
+                    <h2 class="calculator-title">Margin Calculator</h2>
+                    <p class="calculator-subtitle">Calculate the required margin for your trading positions</p>
+                    
+                    <form id="marginCalculator" onsubmit="calculateMargin(event)">
+                        <div class="row">
+                            <div class="col-md-6 mb-3">
+                                <label class="form-label">
+                                    Instrument
+                                    <i class="fas fa-info-circle info-icon" title="Select the trading instrument"></i>
+                                </label>
+                                <select class="form-select" id="marginInstrument" required>
+                                    <option value="">Select Instrument</option>
+                                    <option value="EURUSD">EUR/USD</option>
+                                    <option value="GBPUSD">GBP/USD</option>
+                                    <option value="USDJPY">USD/JPY</option>
+                                    <option value="AUDUSD">AUD/USD</option>
+                                    <option value="USDCHF">USD/CHF</option>
+                                    <option value="NZDUSD">NZD/USD</option>
+                                    <option value="EURJPY">EUR/JPY</option>
+                                    <option value="GBPJPY">GBP/JPY</option>
+                                    <option value="XAUUSD">XAU/USD (Gold)</option>
+                                    <option value="BTCUSD">BTC/USD</option>
+                                </select>
+                            </div>
+                            <div class="col-md-6 mb-3">
+                                <label class="form-label">
+                                    Account Balance
+                                    <i class="fas fa-info-circle info-icon" title="Your account balance"></i>
+                                </label>
+                                <input type="number" class="form-control" id="marginBalance" step="0.01" min="0" placeholder="Account Balance" required>
+                            </div>
                         </div>
-                        <div class="col-md-6 mb-3">
-                            <label class="form-label">Risk Per Trade (%)</label>
-                            <input type="number" class="form-control" id="riskPercent" step="0.1" min="0" max="100" value="2" required>
+                        <div class="row">
+                            <div class="col-md-6 mb-3">
+                                <label class="form-label">
+                                    Lot Size
+                                    <i class="fas fa-info-circle info-icon" title="Position size in lots"></i>
+                                </label>
+                                <input type="number" class="form-control" id="marginLotSize" step="0.01" min="0" placeholder="Lot Size" required>
+                            </div>
+                            <div class="col-md-6 mb-3">
+                                <label class="form-label">
+                                    Leverage
+                                    <i class="fas fa-info-circle info-icon" title="Trading leverage (e.g., 100, 200, 500)"></i>
+                                </label>
+                                <input type="number" class="form-control" id="marginLeverage" step="1" min="1" placeholder="Leverage (e.g., 100)" value="100" required>
+                            </div>
+                        </div>
+                        <button type="submit" class="btn-calculate">
+                            <i class="fas fa-calculator me-2"></i>Calculate
+                        </button>
+                    </form>
+                    
+                    <div class="result-container" id="marginResult" style="display: none;">
+                        <div class="result-box">
+                            <div class="result-label">Required Margin</div>
+                            <div class="result-value" id="marginValue">$0.00</div>
+                        </div>
+                        <div class="result-box">
+                            <div class="result-label">Free Margin</div>
+                            <div class="result-value" id="freeMargin">$0.00</div>
                         </div>
                     </div>
-                    <div class="row">
-                        <div class="col-md-6 mb-3">
-                            <label class="form-label">Entry Price (रु)</label>
-                            <input type="number" class="form-control" id="entryPrice" step="0.01" min="0" required>
-                        </div>
-                        <div class="col-md-6 mb-3">
-                            <label class="form-label">Stop Loss Price (रु)</label>
-                            <input type="number" class="form-control" id="stopLoss" step="0.01" min="0" required>
-                        </div>
-                    </div>
-                    <button type="submit" class="btn btn-primary">
-                        <i class="fas fa-calculator me-2"></i>Calculate Position Size
-                    </button>
-                </form>
-                
-                <div class="result-box" id="positionResult">
-                    <div class="result-label">Position Size</div>
-                    <div class="result-value" id="positionSize">0</div>
-                    <div class="result-label mt-3">Risk Amount</div>
-                    <div class="result-value" style="font-size: 1.5rem;" id="riskAmount">रु 0</div>
                 </div>
-                
-            <?php elseif ($calc_type === 'compound'): ?>
-                <h2 class="calculator-title">Compound Interest Calculator</h2>
-                <p class="calculator-subtitle">Calculate compound interest on your investment</p>
-                
-                <form id="compoundCalculator">
-                    <div class="row">
-                        <div class="col-md-6 mb-3">
-                            <label class="form-label">Principal Amount (रु)</label>
-                            <input type="number" class="form-control" id="principal" step="0.01" min="0" required>
+
+                <!-- Profit/Loss Calculator -->
+                <div class="calculator-content <?php echo $calc_type === 'profit-loss' ? 'active' : ''; ?>" id="profit-loss-calc">
+                    <h2 class="calculator-title">Profit/Loss Calculator</h2>
+                    <p class="calculator-subtitle">Calculate potential profit or loss for your trades</p>
+                    
+                    <form id="profitLossCalculator" onsubmit="calculateProfitLoss(event)">
+                        <div class="row">
+                            <div class="col-md-6 mb-3">
+                                <label class="form-label">
+                                    Instrument
+                                    <i class="fas fa-info-circle info-icon"></i>
+                                </label>
+                                <select class="form-select" id="plInstrument" required>
+                                    <option value="">Select Instrument</option>
+                                    <option value="EURUSD">EUR/USD</option>
+                                    <option value="GBPUSD">GBP/USD</option>
+                                    <option value="USDJPY">USD/JPY</option>
+                                    <option value="AUDUSD">AUD/USD</option>
+                                    <option value="USDCHF">USD/CHF</option>
+                                    <option value="NZDUSD">NZD/USD</option>
+                                    <option value="EURJPY">EUR/JPY</option>
+                                    <option value="GBPJPY">GBP/JPY</option>
+                                    <option value="XAUUSD">XAU/USD (Gold)</option>
+                                    <option value="BTCUSD">BTC/USD</option>
+                                </select>
+                            </div>
+                            <div class="col-md-6 mb-3">
+                                <label class="form-label">
+                                    Trade Type
+                                    <i class="fas fa-info-circle info-icon"></i>
+                                </label>
+                                <select class="form-select" id="plTradeType" required>
+                                    <option value="buy">Buy</option>
+                                    <option value="sell">Sell</option>
+                                </select>
+                            </div>
                         </div>
-                        <div class="col-md-6 mb-3">
-                            <label class="form-label">Annual Interest Rate (%)</label>
-                            <input type="number" class="form-control" id="interestRate" step="0.1" min="0" required>
+                        <div class="row">
+                            <div class="col-md-6 mb-3">
+                                <label class="form-label">
+                                    Entry Price
+                                    <i class="fas fa-info-circle info-icon"></i>
+                                </label>
+                                <input type="number" class="form-control" id="plEntryPrice" step="0.00001" min="0" placeholder="Entry Price" required>
+                            </div>
+                            <div class="col-md-6 mb-3">
+                                <label class="form-label">
+                                    Exit Price
+                                    <i class="fas fa-info-circle info-icon"></i>
+                                </label>
+                                <input type="number" class="form-control" id="plExitPrice" step="0.00001" min="0" placeholder="Exit Price" required>
+                            </div>
+                        </div>
+                        <div class="row">
+                            <div class="col-md-6 mb-3">
+                                <label class="form-label">
+                                    Lot Size
+                                    <i class="fas fa-info-circle info-icon"></i>
+                                </label>
+                                <input type="number" class="form-control" id="plLotSize" step="0.01" min="0" placeholder="Lot Size" required>
+                            </div>
+                            <div class="col-md-6 mb-3">
+                                <label class="form-label">
+                                    Contract Size
+                                    <i class="fas fa-info-circle info-icon" title="Standard is 100,000 for forex"></i>
+                                </label>
+                                <input type="number" class="form-control" id="plContractSize" step="1" min="0" placeholder="Contract Size" value="100000" required>
+                            </div>
+                        </div>
+                        <button type="submit" class="btn-calculate">
+                            <i class="fas fa-calculator me-2"></i>Calculate
+                        </button>
+                    </form>
+                    
+                    <div class="result-container" id="plResult" style="display: none;">
+                        <div class="result-box">
+                            <div class="result-label">Profit/Loss</div>
+                            <div class="result-value" id="plValue">$0.00</div>
+                        </div>
+                        <div class="result-box">
+                            <div class="result-label">Pips</div>
+                            <div class="result-value" id="plPips">0</div>
                         </div>
                     </div>
-                    <div class="row">
-                        <div class="col-md-6 mb-3">
-                            <label class="form-label">Time Period (Years)</label>
-                            <input type="number" class="form-control" id="timePeriod" step="0.1" min="0" required>
-                        </div>
-                        <div class="col-md-6 mb-3">
-                            <label class="form-label">Compounding Frequency</label>
-                            <select class="form-select" id="compoundingFreq" required>
-                                <option value="1">Annually</option>
-                                <option value="2">Semi-Annually</option>
-                                <option value="4">Quarterly</option>
-                                <option value="12" selected>Monthly</option>
-                                <option value="365">Daily</option>
-                            </select>
-                        </div>
-                    </div>
-                    <button type="submit" class="btn btn-primary">
-                        <i class="fas fa-calculator me-2"></i>Calculate Compound Interest
-                    </button>
-                </form>
-                
-                <div class="result-box" id="compoundResult">
-                    <div class="result-label">Final Amount</div>
-                    <div class="result-value" id="finalAmount">रु 0</div>
-                    <div class="result-label mt-3">Interest Earned</div>
-                    <div class="result-value" style="font-size: 1.5rem;" id="interestEarned">रु 0</div>
                 </div>
-                
-            <?php elseif ($calc_type === 'emi'): ?>
-                <h2 class="calculator-title">EMI Calculator</h2>
-                <p class="calculator-subtitle">Calculate your Equated Monthly Installment</p>
-                
-                <form id="emiCalculator">
-                    <div class="row">
-                        <div class="col-md-4 mb-3">
-                            <label class="form-label">Loan Amount (रु)</label>
-                            <input type="number" class="form-control" id="loanAmount" step="0.01" min="0" required>
+
+                <!-- Lot Size Calculator -->
+                <div class="calculator-content <?php echo $calc_type === 'lot-size' ? 'active' : ''; ?>" id="lot-size-calc">
+                    <h2 class="calculator-title">Lot Size Calculator</h2>
+                    <p class="calculator-subtitle">Calculate the optimal lot size based on your risk management parameters</p>
+                    
+                    <form id="lotSizeCalculator" onsubmit="calculateLotSize(event)">
+                        <div class="row">
+                            <div class="col-md-6 mb-3">
+                                <label class="form-label">
+                                    Instrument
+                                    <i class="fas fa-info-circle info-icon"></i>
+                                </label>
+                                <select class="form-select" id="lotInstrument" required>
+                                    <option value="">Select Instrument</option>
+                                    <option value="EURUSD">EUR/USD</option>
+                                    <option value="GBPUSD">GBP/USD</option>
+                                    <option value="USDJPY">USD/JPY</option>
+                                    <option value="AUDUSD">AUD/USD</option>
+                                    <option value="USDCHF">USD/CHF</option>
+                                    <option value="NZDUSD">NZD/USD</option>
+                                    <option value="EURJPY">EUR/JPY</option>
+                                    <option value="GBPJPY">GBP/JPY</option>
+                                    <option value="XAUUSD">XAU/USD (Gold)</option>
+                                    <option value="BTCUSD">BTC/USD</option>
+                                </select>
+                            </div>
+                            <div class="col-md-6 mb-3">
+                                <label class="form-label">
+                                    Account Balance
+                                    <i class="fas fa-info-circle info-icon"></i>
+                                </label>
+                                <input type="number" class="form-control" id="lotBalance" step="0.01" min="0" placeholder="Account Balance" required>
+                            </div>
                         </div>
-                        <div class="col-md-4 mb-3">
-                            <label class="form-label">Interest Rate (% per annum)</label>
-                            <input type="number" class="form-control" id="emiInterestRate" step="0.1" min="0" required>
+                        <div class="row">
+                            <div class="col-md-6 mb-3">
+                                <label class="form-label">
+                                    Risk Percentage
+                                    <i class="fas fa-info-circle info-icon" title="Percentage (1 for 1%)"></i>
+                                </label>
+                                <input type="number" class="form-control" id="lotRiskPercent" step="0.1" min="0" max="100" placeholder="Percentage (1 for 1%)" required>
+                            </div>
+                            <div class="col-md-6 mb-3">
+                                <label class="form-label">
+                                    Entry Price
+                                    <i class="fas fa-info-circle info-icon"></i>
+                                </label>
+                                <input type="number" class="form-control" id="lotEntryPrice" step="0.00001" min="0" placeholder="Entry Price" required>
+                            </div>
                         </div>
-                        <div class="col-md-4 mb-3">
-                            <label class="form-label">Loan Tenure (Months)</label>
-                            <input type="number" class="form-control" id="loanTenure" step="1" min="1" required>
+                        <div class="row">
+                            <div class="col-md-6 mb-3">
+                                <label class="form-label">
+                                    Exit Price (Stop Loss)
+                                    <i class="fas fa-info-circle info-icon"></i>
+                                </label>
+                                <input type="number" class="form-control" id="lotExitPrice" step="0.00001" min="0" placeholder="Exit Price" required>
+                            </div>
+                            <div class="col-md-6 mb-3">
+                                <label class="form-label">
+                                    Leverage
+                                    <i class="fas fa-info-circle info-icon"></i>
+                                </label>
+                                <input type="number" class="form-control" id="lotLeverage" step="1" min="1" placeholder="Leverage" value="100" required>
+                            </div>
+                        </div>
+                        <button type="submit" class="btn-calculate">
+                            <i class="fas fa-calculator me-2"></i>Calculate
+                        </button>
+                    </form>
+                    
+                    <div class="result-container" id="lotResult" style="display: none;">
+                        <div class="result-box">
+                            <div class="result-label">Lot Size</div>
+                            <div class="result-value" id="lotSizeValue">0.00</div>
+                        </div>
+                        <div class="result-box">
+                            <div class="result-label">Risk Amount</div>
+                            <div class="result-value" id="lotRiskAmount">$0.00</div>
                         </div>
                     </div>
-                    <button type="submit" class="btn btn-primary">
-                        <i class="fas fa-calculator me-2"></i>Calculate EMI
-                    </button>
-                </form>
-                
-                <div class="result-box" id="emiResult">
-                    <div class="result-label">Monthly EMI</div>
-                    <div class="result-value" id="emiAmount">रु 0</div>
-                    <div class="result-label mt-3">Total Amount Payable</div>
-                    <div class="result-value" style="font-size: 1.5rem;" id="totalPayable">रु 0</div>
-                    <div class="result-label mt-3">Total Interest</div>
-                    <div class="result-value" style="font-size: 1.5rem;" id="totalInterest">रु 0</div>
                 </div>
-                
-            <?php elseif ($calc_type === 'sip'): ?>
-                <h2 class="calculator-title">SIP Calculator</h2>
-                <p class="calculator-subtitle">Calculate returns on your Systematic Investment Plan</p>
-                
-                <form id="sipCalculator">
-                    <div class="row">
-                        <div class="col-md-4 mb-3">
-                            <label class="form-label">Monthly Investment (रु)</label>
-                            <input type="number" class="form-control" id="monthlyInvestment" step="0.01" min="0" required>
+
+                <!-- Swap Calculator -->
+                <div class="calculator-content <?php echo $calc_type === 'swap' ? 'active' : ''; ?>" id="swap-calc">
+                    <h2 class="calculator-title">Swap Calculator</h2>
+                    <p class="calculator-subtitle">Calculate swap fees for holding positions overnight</p>
+                    
+                    <form id="swapCalculator" onsubmit="calculateSwap(event)">
+                        <div class="row">
+                            <div class="col-md-6 mb-3">
+                                <label class="form-label">
+                                    Instrument
+                                    <i class="fas fa-info-circle info-icon"></i>
+                                </label>
+                                <select class="form-select" id="swapInstrument" required>
+                                    <option value="">Select Instrument</option>
+                                    <option value="EURUSD">EUR/USD</option>
+                                    <option value="GBPUSD">GBP/USD</option>
+                                    <option value="USDJPY">USD/JPY</option>
+                                    <option value="AUDUSD">AUD/USD</option>
+                                    <option value="USDCHF">USD/CHF</option>
+                                    <option value="NZDUSD">NZD/USD</option>
+                                    <option value="EURJPY">EUR/JPY</option>
+                                    <option value="GBPJPY">GBP/JPY</option>
+                                    <option value="XAUUSD">XAU/USD (Gold)</option>
+                                    <option value="BTCUSD">BTC/USD</option>
+                                </select>
+                            </div>
+                            <div class="col-md-6 mb-3">
+                                <label class="form-label">
+                                    Trade Type
+                                    <i class="fas fa-info-circle info-icon"></i>
+                                </label>
+                                <select class="form-select" id="swapTradeType" required>
+                                    <option value="buy">Buy</option>
+                                    <option value="sell">Sell</option>
+                                </select>
+                            </div>
                         </div>
-                        <div class="col-md-4 mb-3">
-                            <label class="form-label">Expected Annual Return (%)</label>
-                            <input type="number" class="form-control" id="sipReturnRate" step="0.1" min="0" required>
+                        <div class="row">
+                            <div class="col-md-6 mb-3">
+                                <label class="form-label">
+                                    Lot Size
+                                    <i class="fas fa-info-circle info-icon"></i>
+                                </label>
+                                <input type="number" class="form-control" id="swapLotSize" step="0.01" min="0" placeholder="Lot Size" required>
+                            </div>
+                            <div class="col-md-6 mb-3">
+                                <label class="form-label">
+                                    Number of Nights
+                                    <i class="fas fa-info-circle info-icon"></i>
+                                </label>
+                                <input type="number" class="form-control" id="swapNights" step="1" min="1" placeholder="Number of Nights" value="1" required>
+                            </div>
                         </div>
-                        <div class="col-md-4 mb-3">
-                            <label class="form-label">Investment Period (Years)</label>
-                            <input type="number" class="form-control" id="sipPeriod" step="0.1" min="0" required>
+                        <div class="row">
+                            <div class="col-md-6 mb-3">
+                                <label class="form-label">
+                                    Swap Long (per lot per night)
+                                    <i class="fas fa-info-circle info-icon" title="Swap rate for long positions"></i>
+                                </label>
+                                <input type="number" class="form-control" id="swapLong" step="0.01" placeholder="Swap Long" value="0.5">
+                            </div>
+                            <div class="col-md-6 mb-3">
+                                <label class="form-label">
+                                    Swap Short (per lot per night)
+                                    <i class="fas fa-info-circle info-icon" title="Swap rate for short positions"></i>
+                                </label>
+                                <input type="number" class="form-control" id="swapShort" step="0.01" placeholder="Swap Short" value="-0.5">
+                            </div>
+                        </div>
+                        <button type="submit" class="btn-calculate">
+                            <i class="fas fa-calculator me-2"></i>Calculate
+                        </button>
+                    </form>
+                    
+                    <div class="result-container" id="swapResult" style="display: none;">
+                        <div class="result-box">
+                            <div class="result-label">Total Swap</div>
+                            <div class="result-value" id="swapValue">$0.00</div>
+                        </div>
+                        <div class="result-box">
+                            <div class="result-label">Per Night</div>
+                            <div class="result-value" id="swapPerNight">$0.00</div>
                         </div>
                     </div>
-                    <button type="submit" class="btn btn-primary">
-                        <i class="fas fa-calculator me-2"></i>Calculate SIP Returns
-                    </button>
-                </form>
-                
-                <div class="result-box" id="sipResult">
-                    <div class="result-label">Total Investment</div>
-                    <div class="result-value" id="totalInvestment">रु 0</div>
-                    <div class="result-label mt-3">Estimated Returns</div>
-                    <div class="result-value" style="font-size: 1.5rem;" id="estimatedReturns">रु 0</div>
-                    <div class="result-label mt-3">Maturity Value</div>
-                    <div class="result-value" style="font-size: 1.5rem;" id="maturityValue">रु 0</div>
                 </div>
-            <?php endif; ?>
+            </div>
+
+            <!-- Disclaimer -->
+            <div class="disclaimer-box">
+                <strong>Disclaimer:</strong> The results from this calculator are for informational purposes only and may differ from actual outcomes due to market conditions. Please use caution and consider professional advice before making trading decisions.
+            </div>
         </div>
     </main>
 
     <!-- Scripts -->
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
     <script>
-        // Toggle calculator dropdown
-        function toggleCalculatorDropdown(event) {
-            if (event) {
-                event.preventDefault();
-                event.stopPropagation();
-            }
-            const dropdown = document.getElementById('calculatorDropdown');
-            const dropdownParent = dropdown.closest('.calculator-dropdown');
-            dropdown.classList.toggle('show');
-            dropdownParent.classList.toggle('active');
+        // Switch calculator tabs
+        function switchCalculator(type) {
+            // Update URL without reload
+            const url = new URL(window.location);
+            url.searchParams.set('type', type);
+            window.history.pushState({}, '', url);
+            
+            // Hide all calculator contents
+            document.querySelectorAll('.calculator-content').forEach(content => {
+                content.classList.remove('active');
+            });
+            
+            // Remove active class from all tabs
+            document.querySelectorAll('.calculator-tab').forEach(tab => {
+                tab.classList.remove('active');
+            });
+            
+            // Show selected calculator
+            document.getElementById(type + '-calc').classList.add('active');
+            
+            // Add active class to clicked tab
+            event.target.closest('.calculator-tab').classList.add('active');
         }
-        
-        // Close dropdown when clicking outside
-        document.addEventListener('click', function(event) {
-            const dropdown = document.getElementById('calculatorDropdown');
-            const dropdownParent = dropdown.closest('.calculator-dropdown');
-            if (!event.target.closest('.calculator-dropdown')) {
-                dropdown.classList.remove('show');
-                dropdownParent.classList.remove('active');
-            }
-        });
         
         // Sidebar toggle function
         function toggleSidebar() {
@@ -913,15 +1205,6 @@ $calc_type = isset($_GET['type']) ? $_GET['type'] : 'position';
             
             if (!sidebar) return;
             
-            // Show calculator dropdown if a calculator type is selected
-            const calcType = '<?php echo $calc_type; ?>';
-            if (calcType) {
-                const dropdown = document.getElementById('calculatorDropdown');
-                const dropdownParent = dropdown.closest('.calculator-dropdown');
-                dropdown.classList.add('show');
-                dropdownParent.classList.add('active');
-            }
-            
             if (window.innerWidth > 768) {
                 sidebar.classList.remove('closed');
                 sidebar.classList.add('show');
@@ -945,87 +1228,137 @@ $calc_type = isset($_GET['type']) ? $_GET['type'] : 'position';
                     toggleBtn.style.setProperty('display', 'block', 'important');
                 }
             }
+            
+            // Handle window resize
+            window.addEventListener('resize', function() {
+                if (window.innerWidth > 768) {
+                    if (!sidebar.classList.contains('closed')) {
+                        sidebar.classList.add('show');
+                        sidebar.classList.remove('closed');
+                        sidebar.style.setProperty('transform', 'translateX(0)', 'important');
+                        if (mainContent) {
+                            mainContent.style.marginLeft = '280px';
+                        }
+                    }
+                    if (toggleBtn) {
+                        toggleBtn.classList.remove('show');
+                        toggleBtn.style.setProperty('display', 'none', 'important');
+                    }
+                } else {
+                    sidebar.classList.add('closed');
+                    sidebar.classList.remove('show');
+                    sidebar.style.setProperty('transform', 'translateX(-100%)', 'important');
+                    if (mainContent) {
+                        mainContent.style.marginLeft = '0';
+                    }
+                    if (toggleBtn) {
+                        toggleBtn.classList.add('show');
+                        toggleBtn.style.setProperty('display', 'block', 'important');
+                    }
+                }
+            });
         });
         
-        // Position Sizing Calculator
-        <?php if ($calc_type === 'position'): ?>
-        document.getElementById('positionCalculator').addEventListener('submit', function(e) {
-            e.preventDefault();
+        // Margin Calculator
+        function calculateMargin(event) {
+            event.preventDefault();
             
-            const accountBalance = parseFloat(document.getElementById('accountBalance').value);
-            const riskPercent = parseFloat(document.getElementById('riskPercent').value);
-            const entryPrice = parseFloat(document.getElementById('entryPrice').value);
-            const stopLoss = parseFloat(document.getElementById('stopLoss').value);
+            const balance = parseFloat(document.getElementById('marginBalance').value);
+            const lotSize = parseFloat(document.getElementById('marginLotSize').value);
+            const leverage = parseFloat(document.getElementById('marginLeverage').value);
             
-            const riskAmount = accountBalance * (riskPercent / 100);
-            const priceDifference = Math.abs(entryPrice - stopLoss);
-            const positionSize = priceDifference > 0 ? riskAmount / priceDifference : 0;
+            // Standard lot size is 100,000 units
+            const contractSize = 100000;
+            const marginRequired = (lotSize * contractSize) / leverage;
+            const freeMargin = balance - marginRequired;
             
-            document.getElementById('positionSize').textContent = positionSize.toFixed(2) + ' units';
-            document.getElementById('riskAmount').textContent = 'रु ' + riskAmount.toFixed(2);
-            document.getElementById('positionResult').classList.add('show');
-        });
-        <?php endif; ?>
+            document.getElementById('marginValue').textContent = '$' + marginRequired.toFixed(2);
+            document.getElementById('freeMargin').textContent = '$' + Math.max(0, freeMargin).toFixed(2);
+            document.getElementById('marginResult').style.display = 'grid';
+        }
         
-        // Compound Interest Calculator
-        <?php if ($calc_type === 'compound'): ?>
-        document.getElementById('compoundCalculator').addEventListener('submit', function(e) {
-            e.preventDefault();
+        // Profit/Loss Calculator
+        function calculateProfitLoss(event) {
+            event.preventDefault();
             
-            const principal = parseFloat(document.getElementById('principal').value);
-            const rate = parseFloat(document.getElementById('interestRate').value) / 100;
-            const time = parseFloat(document.getElementById('timePeriod').value);
-            const n = parseFloat(document.getElementById('compoundingFreq').value);
+            const tradeType = document.getElementById('plTradeType').value;
+            const entryPrice = parseFloat(document.getElementById('plEntryPrice').value);
+            const exitPrice = parseFloat(document.getElementById('plExitPrice').value);
+            const lotSize = parseFloat(document.getElementById('plLotSize').value);
+            const contractSize = parseFloat(document.getElementById('plContractSize').value);
             
-            const amount = principal * Math.pow(1 + (rate / n), n * time);
-            const interest = amount - principal;
+            let profitLoss;
+            if (tradeType === 'buy') {
+                profitLoss = (exitPrice - entryPrice) * lotSize * contractSize;
+            } else {
+                profitLoss = (entryPrice - exitPrice) * lotSize * contractSize;
+            }
             
-            document.getElementById('finalAmount').textContent = 'रु ' + amount.toFixed(2);
-            document.getElementById('interestEarned').textContent = 'रु ' + interest.toFixed(2);
-            document.getElementById('compoundResult').classList.add('show');
-        });
-        <?php endif; ?>
+            // Calculate pips (for 4 decimal places, 1 pip = 0.0001)
+            const pipValue = 0.0001;
+            const pips = Math.abs((exitPrice - entryPrice) / pipValue);
+            
+            const plValueElement = document.getElementById('plValue');
+            plValueElement.textContent = '$' + profitLoss.toFixed(2);
+            plValueElement.style.color = profitLoss >= 0 ? 'var(--primary)' : '#ef4444';
+            
+            document.getElementById('plPips').textContent = pips.toFixed(1);
+            document.getElementById('plResult').style.display = 'grid';
+        }
         
-        // EMI Calculator
-        <?php if ($calc_type === 'emi'): ?>
-        document.getElementById('emiCalculator').addEventListener('submit', function(e) {
-            e.preventDefault();
+        // Lot Size Calculator
+        function calculateLotSize(event) {
+            event.preventDefault();
             
-            const principal = parseFloat(document.getElementById('loanAmount').value);
-            const rate = parseFloat(document.getElementById('emiInterestRate').value) / 100 / 12; // Monthly rate
-            const tenure = parseFloat(document.getElementById('loanTenure').value);
+            const balance = parseFloat(document.getElementById('lotBalance').value);
+            const riskPercent = parseFloat(document.getElementById('lotRiskPercent').value);
+            const entryPrice = parseFloat(document.getElementById('lotEntryPrice').value);
+            const exitPrice = parseFloat(document.getElementById('lotExitPrice').value);
+            const leverage = parseFloat(document.getElementById('lotLeverage').value);
             
-            const emi = principal * rate * Math.pow(1 + rate, tenure) / (Math.pow(1 + rate, tenure) - 1);
-            const totalPayable = emi * tenure;
-            const totalInterest = totalPayable - principal;
+            // Calculate risk amount
+            const riskAmount = balance * (riskPercent / 100);
             
-            document.getElementById('emiAmount').textContent = 'रु ' + emi.toFixed(2);
-            document.getElementById('totalPayable').textContent = 'रु ' + totalPayable.toFixed(2);
-            document.getElementById('totalInterest').textContent = 'रु ' + totalInterest.toFixed(2);
-            document.getElementById('emiResult').classList.add('show');
-        });
-        <?php endif; ?>
+            // Calculate price difference
+            const priceDifference = Math.abs(entryPrice - exitPrice);
+            
+            // Standard contract size
+            const contractSize = 100000;
+            
+            // Calculate lot size
+            let lotSize = 0;
+            if (priceDifference > 0) {
+                lotSize = riskAmount / (priceDifference * contractSize);
+            }
+            
+            document.getElementById('lotSizeValue').textContent = lotSize.toFixed(2);
+            document.getElementById('lotRiskAmount').textContent = '$' + riskAmount.toFixed(2);
+            document.getElementById('lotResult').style.display = 'grid';
+        }
         
-        // SIP Calculator
-        <?php if ($calc_type === 'sip'): ?>
-        document.getElementById('sipCalculator').addEventListener('submit', function(e) {
-            e.preventDefault();
+        // Swap Calculator
+        function calculateSwap(event) {
+            event.preventDefault();
             
-            const monthlyInvestment = parseFloat(document.getElementById('monthlyInvestment').value);
-            const rate = parseFloat(document.getElementById('sipReturnRate').value) / 100 / 12; // Monthly rate
-            const period = parseFloat(document.getElementById('sipPeriod').value) * 12; // In months
+            const tradeType = document.getElementById('swapTradeType').value;
+            const lotSize = parseFloat(document.getElementById('swapLotSize').value);
+            const nights = parseFloat(document.getElementById('swapNights').value);
+            const swapLong = parseFloat(document.getElementById('swapLong').value) || 0;
+            const swapShort = parseFloat(document.getElementById('swapShort').value) || 0;
             
-            const totalInvestment = monthlyInvestment * period;
-            const maturityValue = monthlyInvestment * ((Math.pow(1 + rate, period) - 1) / rate) * (1 + rate);
-            const estimatedReturns = maturityValue - totalInvestment;
+            let swapPerNight;
+            if (tradeType === 'buy') {
+                swapPerNight = swapLong * lotSize;
+            } else {
+                swapPerNight = Math.abs(swapShort) * lotSize;
+            }
             
-            document.getElementById('totalInvestment').textContent = 'रु ' + totalInvestment.toFixed(2);
-            document.getElementById('estimatedReturns').textContent = 'रु ' + estimatedReturns.toFixed(2);
-            document.getElementById('maturityValue').textContent = 'रु ' + maturityValue.toFixed(2);
-            document.getElementById('sipResult').classList.add('show');
-        });
-        <?php endif; ?>
+            const totalSwap = swapPerNight * nights;
+            
+            document.getElementById('swapPerNight').textContent = '$' + swapPerNight.toFixed(2);
+            document.getElementById('swapValue').textContent = '$' + totalSwap.toFixed(2);
+            document.getElementById('swapResult').style.display = 'grid';
+        }
     </script>
 </body>
 </html>
-

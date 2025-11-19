@@ -4,13 +4,14 @@ session_start();
 
 // फर्म सब्मिट भएमा
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
-    $email = $_POST['email'];
+    $login_input = trim($_POST['email']); // Can be username or email
     $password = $_POST['password'];
 
     try {
-        $stmt = $pdo->prepare("SELECT * FROM users WHERE email = ?");
-        $stmt->execute([$email]);
-        $user = $stmt->fetch();
+        // Check both username and email
+        $stmt = $pdo->prepare("SELECT * FROM users WHERE username = ? OR email = ?");
+        $stmt->execute([$login_input, $login_input]);
+        $user = $stmt->fetch(PDO::FETCH_ASSOC);
 
         if ($user && password_verify($password, $user['password'])) {
             // सेसनमा युजर डाटा सेभ गर्ने
@@ -22,7 +23,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             header("Location: dashboard/dashboard.php");
             exit();
         } else {
-            $error = "गलत इमेल वा पासवर्ड!";
+            $error = "गलत username/इमेल वा पासवर्ड!";
         }
     } catch (PDOException $e) {
         $error = "डाटाबेस त्रुटि: " . $e->getMessage();
@@ -254,8 +255,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             
             <form method="POST">
                 <div class="mb-3">
-                    <label for="email" class="form-label">इमेल ठेगाना</label>
-                    <input type="email" class="form-control" id="email" name="email" required>
+                    <label for="email" class="form-label">Username वा इमेल ठेगाना</label>
+                    <input type="text" class="form-control" id="email" name="email" placeholder="admin वा admin@npltrader.com" required>
+                    <small class="text-muted">तपाईं username वा email दुवै प्रयोग गर्न सक्नुहुन्छ</small>
                 </div>
                 <div class="mb-3">
                     <label for="password" class="form-label">पासवर्ड</label>
