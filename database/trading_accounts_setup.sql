@@ -7,7 +7,8 @@
 USE `trading_db`;
 
 -- ============================================
--- 1. TRADING_ACCOUNTS TABLE (ट्रेडिङ खाता तालिका)
+-- 1. TRADING_ACCOUNTS TABLE (ट्रेडिङ खाता तालिका sabaiko full format ho yo ki) 
+
 -- ============================================
 CREATE TABLE IF NOT EXISTS `trading_accounts` (
   `id` int(11) NOT NULL AUTO_INCREMENT,
