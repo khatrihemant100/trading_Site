@@ -440,6 +440,281 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action']) && $_POST['
     }
 }
 
+// Handle CSV Upload for Journal Entries
+if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action']) && $_POST['action'] === 'upload_csv') {
+    try {
+        if (!isset($_FILES['csv_file']) || $_FILES['csv_file']['error'] !== UPLOAD_ERR_OK) {
+            throw new Exception("CSV file upload failed. Please select a valid CSV file.");
+        }
+        
+        $file = $_FILES['csv_file'];
+        $account_id = !empty($_POST['account_id']) ? intval($_POST['account_id']) : null;
+        
+        // Validate file type
+        $file_ext = strtolower(pathinfo($file['name'], PATHINFO_EXTENSION));
+        if ($file_ext !== 'csv') {
+            throw new Exception("Invalid file type. Please upload a CSV file.");
+        }
+        
+        // Open and read CSV file
+        $handle = fopen($file['tmp_name'], 'r');
+        if ($handle === false) {
+            throw new Exception("Could not read CSV file.");
+        }
+        
+        // Read header row
+        $headers = fgetcsv($handle);
+        if ($headers === false || empty($headers)) {
+            fclose($handle);
+            throw new Exception("CSV file is empty or invalid.");
+        }
+        
+        // Normalize headers (trim and lowercase)
+        $headers = array_map(function($h) {
+            return strtolower(trim($h));
+        }, $headers);
+        
+        // Map CSV columns to database fields
+        $column_map = [
+            'symbol' => ['symbol', 'pair', 'instrument', 'currency_pair'],
+            'trade_date' => ['trade_date', 'date', 'entry_date', 'open_date'],
+            'trade_type' => ['trade_type', 'type', 'side', 'direction', 'buy/sell'],
+            'entry_price' => ['entry_price', 'open_price', 'entry', 'open'],
+            'exit_price' => ['exit_price', 'close_price', 'exit', 'close'],
+            'quantity' => ['quantity', 'size', 'volume', 'units'],
+            'lot' => ['lot', 'lots'],
+            'stop_loss' => ['stop_loss', 'sl', 'stop loss'],
+            'take_profit' => ['take_profit', 'tp', 'take profit'],
+            'entry_time' => ['entry_time', 'open_time', 'entry time'],
+            'exit_time' => ['exit_time', 'close_time', 'exit time'],
+            'profit_loss' => ['profit_loss', 'pnl', 'profit', 'loss', 'net_pnl', 'profit/loss'],
+            'session_type' => ['session_type', 'session', 'trading_session'],
+            'risk_percent' => ['risk_percent', 'risk%', 'risk'],
+            'r_multiple' => ['r_multiple', 'r', 'r-multiple'],
+            'strategy' => ['strategy', 'strategy_name'],
+            'setup_type' => ['setup_type', 'setup'],
+            'emotion_before' => ['emotion_before', 'emotion before'],
+            'emotion_during' => ['emotion_during', 'emotion during'],
+            'emotion_after' => ['emotion_after', 'emotion after'],
+            'notes' => ['notes', 'note', 'comment', 'description'],
+            'trade_status' => ['trade_status', 'status']
+        ];
+        
+        // Find column indices
+        $column_indices = [];
+        foreach ($column_map as $db_field => $possible_names) {
+            foreach ($possible_names as $name) {
+                $index = array_search($name, $headers);
+                if ($index !== false) {
+                    $column_indices[$db_field] = $index;
+                    break;
+                }
+            }
+        }
+        
+        // Required fields check
+        if (!isset($column_indices['symbol']) || !isset($column_indices['trade_date']) || 
+            !isset($column_indices['trade_type']) || !isset($column_indices['entry_price'])) {
+            fclose($handle);
+            throw new Exception("CSV must contain: symbol, trade_date, trade_type, and entry_price columns.");
+        }
+        
+        $success_count = 0;
+        $error_count = 0;
+        $errors = [];
+        $row_num = 1; // Header is row 1
+        
+        // Process each row
+        while (($row = fgetcsv($handle)) !== false) {
+            $row_num++;
+            
+            // Skip empty rows
+            if (empty(array_filter($row))) {
+                continue;
+            }
+            
+            try {
+                // Extract values
+                $symbol = trim($row[$column_indices['symbol']] ?? '');
+                $trade_date = trim($row[$column_indices['trade_date']] ?? '');
+                $trade_type_raw = strtolower(trim($row[$column_indices['trade_type']] ?? ''));
+                $entry_price = floatval($row[$column_indices['entry_price']] ?? 0);
+                
+                // Validate required fields
+                if (empty($symbol) || empty($trade_date) || empty($trade_type_raw) || $entry_price <= 0) {
+                    $errors[] = "Row $row_num: Missing required fields (symbol, trade_date, trade_type, entry_price)";
+                    $error_count++;
+                    continue;
+                }
+                
+                // Normalize trade_type
+                $trade_type = 'buy';
+                if (in_array($trade_type_raw, ['sell', 'short', 's'])) {
+                    $trade_type = 'sell';
+                } elseif (!in_array($trade_type_raw, ['buy', 'long', 'b'])) {
+                    $trade_type = 'buy'; // Default
+                }
+                
+                // Parse date
+                $parsed_date = null;
+                $date_formats = ['Y-m-d', 'Y/m/d', 'd-m-Y', 'd/m/Y', 'm-d-Y', 'm/d/Y'];
+                foreach ($date_formats as $format) {
+                    $date_obj = DateTime::createFromFormat($format, $trade_date);
+                    if ($date_obj !== false) {
+                        $parsed_date = $date_obj->format('Y-m-d');
+                        break;
+                    }
+                }
+                if ($parsed_date === null) {
+                    // Try strtotime as fallback
+                    $timestamp = strtotime($trade_date);
+                    if ($timestamp !== false) {
+                        $parsed_date = date('Y-m-d', $timestamp);
+                    } else {
+                        $errors[] = "Row $row_num: Invalid date format: $trade_date";
+                        $error_count++;
+                        continue;
+                    }
+                }
+                
+                // Extract optional fields
+                $exit_price = isset($column_indices['exit_price']) && !empty($row[$column_indices['exit_price']]) 
+                    ? floatval($row[$column_indices['exit_price']]) : null;
+                $quantity = isset($column_indices['quantity']) && !empty($row[$column_indices['quantity']]) 
+                    ? floatval($row[$column_indices['quantity']]) : 1.0;
+                $lot = isset($column_indices['lot']) && !empty($row[$column_indices['lot']]) 
+                    ? floatval($row[$column_indices['lot']]) : null;
+                $stop_loss = isset($column_indices['stop_loss']) && !empty($row[$column_indices['stop_loss']]) 
+                    ? floatval($row[$column_indices['stop_loss']]) : null;
+                $take_profit = isset($column_indices['take_profit']) && !empty($row[$column_indices['take_profit']]) 
+                    ? floatval($row[$column_indices['take_profit']]) : null;
+                $entry_time = isset($column_indices['entry_time']) && !empty($row[$column_indices['entry_time']]) 
+                    ? trim($row[$column_indices['entry_time']]) : null;
+                $exit_time = isset($column_indices['exit_time']) && !empty($row[$column_indices['exit_time']]) 
+                    ? trim($row[$column_indices['exit_time']]) : null;
+                $profit_loss = isset($column_indices['profit_loss']) && !empty($row[$column_indices['profit_loss']]) 
+                    ? floatval($row[$column_indices['profit_loss']]) : null;
+                $session_type = isset($column_indices['session_type']) && !empty($row[$column_indices['session_type']]) 
+                    ? trim($row[$column_indices['session_type']]) : null;
+                $risk_percent = isset($column_indices['risk_percent']) && !empty($row[$column_indices['risk_percent']]) 
+                    ? floatval($row[$column_indices['risk_percent']]) : null;
+                $r_multiple = isset($column_indices['r_multiple']) && !empty($row[$column_indices['r_multiple']]) 
+                    ? floatval($row[$column_indices['r_multiple']]) : null;
+                $strategy = isset($column_indices['strategy']) && !empty($row[$column_indices['strategy']]) 
+                    ? trim($row[$column_indices['strategy']]) : null;
+                $setup_type = isset($column_indices['setup_type']) && !empty($row[$column_indices['setup_type']]) 
+                    ? trim($row[$column_indices['setup_type']]) : null;
+                $emotion_before = isset($column_indices['emotion_before']) && !empty($row[$column_indices['emotion_before']]) 
+                    ? trim($row[$column_indices['emotion_before']]) : null;
+                $emotion_during = isset($column_indices['emotion_during']) && !empty($row[$column_indices['emotion_during']]) 
+                    ? trim($row[$column_indices['emotion_during']]) : null;
+                $emotion_after = isset($column_indices['emotion_after']) && !empty($row[$column_indices['emotion_after']]) 
+                    ? trim($row[$column_indices['emotion_after']]) : null;
+                $notes = isset($column_indices['notes']) && !empty($row[$column_indices['notes']]) 
+                    ? trim($row[$column_indices['notes']]) : null;
+                $trade_status = isset($column_indices['trade_status']) && !empty($row[$column_indices['trade_status']]) 
+                    ? strtolower(trim($row[$column_indices['trade_status']])) : 'closed';
+                
+                // Validate trade_status
+                if (!in_array($trade_status, ['open', 'closed', 'breakeven'])) {
+                    $trade_status = 'closed';
+                }
+                
+                // Calculate profit_loss if not provided
+                if ($profit_loss === null && $exit_price !== null && $exit_price > 0) {
+                    if ($trade_type === 'buy') {
+                        $profit_loss = ($exit_price - $entry_price) * ($lot ? $lot * 100000 : $quantity);
+                    } else {
+                        $profit_loss = ($entry_price - $exit_price) * ($lot ? $lot * 100000 : $quantity);
+                    }
+                }
+                
+                // Calculate R multiple if not provided
+                if ($r_multiple === null && $stop_loss !== null && $entry_price > 0 && $profit_loss !== null) {
+                    $risk_amount = abs($entry_price - $stop_loss) * ($lot ? $lot * 100000 : $quantity);
+                    if ($risk_amount > 0) {
+                        $r_multiple = $profit_loss / $risk_amount;
+                    }
+                }
+                
+                // Insert into database
+                $stmt = $pdo->prepare("
+                    INSERT INTO trading_journal 
+                    (user_id, account_id, symbol, trade_type, quantity, lot, entry_price, exit_price, stop_loss, take_profit,
+                     entry_time, exit_time, trade_date, session_type, risk_percent, r_multiple, strategy, setup_type,
+                     emotion_before, emotion_during, emotion_after, mistake_tags, notes, screenshot_path, profit_loss, trade_status) 
+                    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                ");
+                $stmt->execute([
+                    $_SESSION['user_id'], $account_id, $symbol, $trade_type, 
+                    $quantity, $lot, $entry_price, $exit_price, $stop_loss, $take_profit,
+                    $entry_time, $exit_time, $parsed_date, $session_type, $risk_percent, $r_multiple,
+                    $strategy, $setup_type, $emotion_before, $emotion_during, $emotion_after,
+                    null, $notes, null, $profit_loss, $trade_status
+                ]);
+                
+                $success_count++;
+                
+            } catch (Exception $e) {
+                $errors[] = "Row $row_num: " . $e->getMessage();
+                $error_count++;
+            }
+        }
+        
+        fclose($handle);
+        
+        // Update account balance if account_id is provided
+        if ($account_id && $success_count > 0) {
+            try {
+                $withdrawals_stmt = $pdo->prepare("
+                    SELECT COALESCE(SUM(withdrawal_amount), 0) as total_withdrawals 
+                    FROM account_withdrawals 
+                    WHERE account_id = ?
+                ");
+                $withdrawals_stmt->execute([$account_id]);
+                $withdrawals_data = $withdrawals_stmt->fetch(PDO::FETCH_ASSOC);
+                $total_withdrawals = floatval($withdrawals_data['total_withdrawals'] ?? 0);
+                
+                $update_stmt = $pdo->prepare("
+                    UPDATE trading_accounts 
+                    SET current_balance = initial_balance + (
+                        SELECT COALESCE(SUM(profit_loss), 0) 
+                        FROM trading_journal 
+                        WHERE account_id = ? AND profit_loss IS NOT NULL
+                    ) - ?
+                    WHERE id = ?
+                ");
+                $update_stmt->execute([$account_id, $total_withdrawals, $account_id]);
+            } catch (PDOException $e) {
+                // Log error but don't fail the upload
+            }
+        }
+        
+        // Build success message
+        if ($success_count > 0) {
+            $message = "$success_count trade(s) सफलतापूर्वक import भयो!";
+            if ($error_count > 0) {
+                $message .= " $error_count row(s) मा त्रुटि भयो।";
+            }
+            $message_type = $error_count > 0 ? 'warning' : 'success';
+        } else {
+            $message = "कुनै पनि trade import भएन।";
+            $message_type = 'danger';
+        }
+        
+        // Add errors to message if any
+        if (!empty($errors) && count($errors) <= 10) {
+            $message .= "<br><small>" . implode("<br>", $errors) . "</small>";
+        } elseif (!empty($errors)) {
+            $message .= "<br><small>पहिलो 10 त्रुटिहरू:<br>" . implode("<br>", array_slice($errors, 0, 10)) . "</small>";
+        }
+        
+    } catch (Exception $e) {
+        $message = "CSV Upload त्रुटि: " . $e->getMessage();
+        $message_type = 'danger';
+    }
+}
+
 // Handle Trade Deletion
 if (isset($_GET['delete_trade'])) {
     try {
@@ -1671,6 +1946,9 @@ $reviews = $reviews_stmt->fetchAll(PDO::FETCH_ASSOC);
                         <button class="btn btn-primary me-2" data-bs-toggle="modal" data-bs-target="#addTradeModal">
                             <i class="fas fa-plus me-2"></i>Add Trade
                         </button>
+                        <button class="btn btn-info me-2" data-bs-toggle="modal" data-bs-target="#uploadCsvModal">
+                            <i class="fas fa-file-csv me-2"></i>Upload CSV
+                        </button>
                         <?php if ($selected_account_id): ?>
                             <button class="btn btn-success" data-bs-toggle="modal" data-bs-target="#addWithdrawalModal">
                                 <i class="fas fa-money-bill-wave me-2"></i>Add Withdrawal
@@ -2461,6 +2739,82 @@ $reviews = $reviews_stmt->fetchAll(PDO::FETCH_ASSOC);
                 <div class="modal-footer">
                     <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
                     <button type="submit" form="tradeForm" class="btn btn-primary">Save Trade</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Upload CSV Modal -->
+    <div class="modal fade" id="uploadCsvModal" tabindex="-1">
+        <div class="modal-dialog modal-lg">
+            <div class="modal-content bg-dark">
+                <div class="modal-header">
+                    <h5 class="modal-title"><i class="fas fa-file-csv me-2"></i>Upload CSV File</h5>
+                    <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+                </div>
+                <div class="modal-body">
+                    <div class="alert alert-info mb-4" role="alert">
+                        <i class="fas fa-info-circle me-2"></i>
+                        <strong>CSV Format:</strong> Your CSV file should contain the following columns (at minimum):
+                        <ul class="mb-0 mt-2">
+                            <li><strong>Required:</strong> symbol, trade_date, trade_type, entry_price</li>
+                            <li><strong>Optional:</strong> exit_price, quantity, lot, stop_loss, take_profit, entry_time, exit_time, profit_loss, session_type, risk_percent, r_multiple, strategy, setup_type, emotion_before, emotion_during, emotion_after, notes, trade_status</li>
+                        </ul>
+                    </div>
+                    
+                    <form id="csvUploadForm" action="journal.php" method="POST" enctype="multipart/form-data">
+                        <input type="hidden" name="action" value="upload_csv">
+                        
+                        <?php if (!empty($accounts)): ?>
+                            <div class="mb-3">
+                                <label class="form-label">Trading Account (Optional)</label>
+                                <select class="form-select" name="account_id">
+                                    <option value="">Select Account (Optional)</option>
+                                    <?php foreach ($accounts as $acc): ?>
+                                        <option value="<?php echo $acc['id']; ?>" <?php echo ($selected_account_id == $acc['id']) ? 'selected' : ''; ?>>
+                                            <?php echo htmlspecialchars($acc['account_name']); ?> (<?php echo ucfirst($acc['account_type']); ?>)
+                                        </option>
+                                    <?php endforeach; ?>
+                                </select>
+                                <small class="text-muted">If selected, trades will be linked to this account</small>
+                            </div>
+                        <?php endif; ?>
+                        
+                        <div class="mb-3">
+                            <label class="form-label">CSV File *</label>
+                            <input type="file" class="form-control" name="csv_file" accept=".csv" required>
+                            <small class="text-muted">Select a CSV file containing your trade data</small>
+                        </div>
+                        
+                        <div class="alert alert-warning mb-3" role="alert">
+                            <i class="fas fa-exclamation-triangle me-2"></i>
+                            <strong>Important Notes:</strong>
+                            <ul class="mb-0 mt-2">
+                                <li>Column names are case-insensitive and can have variations (e.g., "symbol", "pair", "instrument")</li>
+                                <li>Date format: YYYY-MM-DD, DD-MM-YYYY, MM/DD/YYYY, or any standard date format</li>
+                                <li>Trade type: "buy"/"long"/"b" or "sell"/"short"/"s"</li>
+                                <li>Empty rows will be skipped</li>
+                                <li>If profit_loss is not provided, it will be calculated from entry_price and exit_price</li>
+                            </ul>
+                        </div>
+                        
+                        <div class="card bg-secondary mb-3">
+                            <div class="card-header">
+                                <strong>Example CSV Format:</strong>
+                            </div>
+                            <div class="card-body">
+                                <pre class="text-light mb-0" style="font-size: 0.85em;">symbol,trade_date,trade_type,entry_price,exit_price,quantity,stop_loss,take_profit,profit_loss
+EURUSD,2024-01-15,buy,1.0850,1.0900,0.01,1.0800,1.0950,50.00
+GBPUSD,2024-01-16,sell,1.2650,1.2600,0.02,1.2700,1.2550,100.00</pre>
+                            </div>
+                        </div>
+                    </form>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                    <button type="submit" form="csvUploadForm" class="btn btn-primary">
+                        <i class="fas fa-upload me-2"></i>Upload & Import
+                    </button>
                 </div>
             </div>
         </div>
