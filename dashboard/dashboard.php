@@ -8,6 +8,19 @@ if (!isset($_SESSION['user_id'])) {
 }
 
 require_once __DIR__.'/../config/database.php';
+require_once __DIR__.'/dashboard_mode.php';
+
+// Handle mode switching
+if (isset($_GET['mode'])) {
+    $mode = $_GET['mode'] === 'demo' ? 1 : 0;
+    set_dashboard_mode($mode);
+    // Redirect to avoid resubmission
+    header("Location: dashboard.php");
+    exit();
+}
+
+$is_demo = is_demo_mode();
+$mode_name = get_mode_name();
 
 // युजर डाटा फेच गर्ने
 try {
@@ -20,17 +33,18 @@ try {
         exit();
     }
     
-    // Trading Journal entries फेच गर्ने
-    $journal_stmt = $pdo->prepare("SELECT * FROM trading_journal WHERE user_id = ? ORDER BY trade_date DESC, created_at DESC LIMIT 10");
-    $journal_stmt->execute([$_SESSION['user_id']]);
+    
+    // Trading Journal entries फेच गर्ने (filtered by Real/Demo mode)
+    $journal_stmt = $pdo->prepare("SELECT * FROM trading_journal WHERE user_id = ? AND is_demo = ? ORDER BY trade_date DESC, created_at DESC LIMIT 10");
+    $journal_stmt->execute([$_SESSION['user_id'], $is_demo]);
     $journal_entries = $journal_stmt->fetchAll(PDO::FETCH_ASSOC);
     
-    // Open positions (trades without exit price)
-    $open_positions_stmt = $pdo->prepare("SELECT COUNT(*) FROM trading_journal WHERE user_id = ? AND exit_price IS NULL");
-    $open_positions_stmt->execute([$_SESSION['user_id']]);
+    // Open positions (trades without exit price) - filtered by mode
+    $open_positions_stmt = $pdo->prepare("SELECT COUNT(*) FROM trading_journal WHERE user_id = ? AND is_demo = ? AND exit_price IS NULL");
+    $open_positions_stmt->execute([$_SESSION['user_id'], $is_demo]);
     $open_positions = $open_positions_stmt->fetchColumn();
     
-    // Statistics फेच गर्ने
+    // Statistics फेच गर्ने (filtered by Real/Demo mode)
     $stats_stmt = $pdo->prepare("
         SELECT 
             COUNT(*) as total_trades,
@@ -41,9 +55,9 @@ try {
             MAX(profit_loss) as best_trade,
             MIN(profit_loss) as worst_trade
         FROM trading_journal 
-        WHERE user_id = ?
+        WHERE user_id = ? AND is_demo = ?
     ");
-    $stats_stmt->execute([$_SESSION['user_id']]);
+    $stats_stmt->execute([$_SESSION['user_id'], $is_demo]);
     $stats = $stats_stmt->fetch(PDO::FETCH_ASSOC);
     
     // Win rate calculate गर्ने
@@ -85,7 +99,15 @@ try {
             color: var(--text-primary);
             font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
             overflow-x: hidden;
+            transition: all 0.3s ease;
         }
+        
+        <?php if ($is_demo): ?>
+        body.demo-mode-active {
+            --primary: #fbbf24;
+            --primary-dark: #f59e0b;
+        }
+        <?php endif; ?>
         
         /* Sidebar */
         .sidebar {
@@ -1166,195 +1188,6 @@ try {
             animation: shimmer 2s infinite;
         }
         
-        /* Live Price Cards */
-        .price-card {
-            background: linear-gradient(135deg, var(--dark-card) 0%, var(--dark-hover) 100%);
-            border: 2px solid var(--border-color);
-            border-radius: 16px;
-            padding: 24px;
-            transition: all 0.4s cubic-bezier(0.4, 0, 0.2, 1);
-            position: relative;
-            overflow: hidden;
-            animation: fadeInUp 0.6s ease-out;
-        }
-        
-        .price-card::before {
-            content: '';
-            position: absolute;
-            top: 0;
-            left: -100%;
-            width: 100%;
-            height: 100%;
-            background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.05), transparent);
-            transition: left 0.6s;
-        }
-        
-        .price-card:hover::before {
-            left: 100%;
-        }
-        
-        .price-card:hover {
-            transform: translateY(-8px) scale(1.02);
-            box-shadow: 0 16px 40px rgba(0, 0, 0, 0.4);
-        }
-        
-        .gold-card {
-            border-color: #fbbf24;
-        }
-        
-        .gold-card:hover {
-            border-color: #f59e0b;
-            box-shadow: 0 16px 40px rgba(251, 191, 36, 0.3);
-        }
-        
-        .nepse-card {
-            border-color: #3b82f6;
-        }
-        
-        .nepse-card:hover {
-            border-color: #2563eb;
-            box-shadow: 0 16px 40px rgba(59, 130, 246, 0.3);
-        }
-        
-        .btc-card {
-            border-color: #f59e0b;
-        }
-        
-        .btc-card:hover {
-            border-color: #d97706;
-            box-shadow: 0 16px 40px rgba(245, 158, 11, 0.3);
-        }
-        
-        .price-card-header {
-            display: flex;
-            align-items: center;
-            gap: 16px;
-            margin-bottom: 20px;
-        }
-        
-        .price-card-icon {
-            width: 60px;
-            height: 60px;
-            border-radius: 12px;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            font-size: 1.8rem;
-            color: white;
-            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
-        }
-        
-        .gold-icon {
-            background: linear-gradient(135deg, #fbbf24 0%, #f59e0b 100%);
-        }
-        
-        .nepse-icon {
-            background: linear-gradient(135deg, #3b82f6 0%, #2563eb 100%);
-        }
-        
-        .btc-icon {
-            background: linear-gradient(135deg, #f59e0b 0%, #d97706 100%);
-        }
-        
-        .price-card-title h5 {
-            margin: 0;
-            font-size: 1.1rem;
-            font-weight: 600;
-            color: var(--text-primary);
-        }
-        
-        .price-label {
-            font-size: 0.75rem;
-            color: var(--text-secondary);
-            text-transform: uppercase;
-            letter-spacing: 0.5px;
-        }
-        
-        .price-value {
-            font-size: 2.2rem;
-            font-weight: 700;
-            color: var(--text-primary);
-            margin-bottom: 12px;
-            min-height: 50px;
-            display: flex;
-            align-items: center;
-        }
-        
-        .price-change {
-            font-size: 0.9rem;
-            font-weight: 600;
-            display: flex;
-            align-items: center;
-            gap: 8px;
-        }
-        
-        .price-change.positive {
-            color: var(--primary);
-        }
-        
-        .price-change.negative {
-            color: #ef4444;
-        }
-        
-        .price-update-time {
-            font-size: 0.75rem;
-            color: var(--text-secondary);
-            margin-top: 8px;
-            font-style: italic;
-        }
-        
-        .loading-spinner {
-            color: var(--text-secondary);
-        }
-        
-        /* TradingView Widget Wrapper - Clips bottom copyright area */
-        .tradingview-widget-wrapper {
-            position: relative;
-            height: 180px;
-            overflow: hidden;
-            border-radius: 8px;
-            margin-top: 10px;
-        }
-        
-        /* TradingView Widget Styles */
-        .tradingview-widget-container {
-            border-radius: 8px;
-            background: transparent;
-            position: relative;
-            height: 100%;
-            overflow: hidden;
-            /* Clip bottom 30px where copyright appears */
-            clip-path: inset(0 0 30px 0);
-            -webkit-clip-path: inset(0 0 30px 0);
-        }
-        
-        .tradingview-widget-container__widget {
-            width: 100%;
-            height: 100%;
-        }
-        
-        /* Hide TradingView logo and copyright using wrapper overflow */
-        .tradingview-widget-wrapper iframe {
-            position: relative;
-            /* Move up to hide bottom copyright */
-            margin-bottom: -30px;
-        }
-        
-        /* Additional hiding for any visible elements */
-        .tradingview-widget-wrapper .tradingview-widget-copyright,
-        .tradingview-widget-wrapper a[href*="tradingview.com"],
-        .tradingview-widget-wrapper div[class*="copyright"],
-        .tradingview-widget-wrapper span[class*="trademark"] {
-            display: none !important;
-            visibility: hidden !important;
-            opacity: 0 !important;
-            height: 0 !important;
-            width: 0 !important;
-            overflow: hidden !important;
-            position: absolute !important;
-            bottom: -100px !important;
-        }
-        
         /* Motivation Card */
         .motivation-card {
             background: linear-gradient(135deg, var(--dark-card) 0%, rgba(16, 185, 129, 0.1) 100%);
@@ -1456,9 +1289,171 @@ try {
             opacity: 1;
             transform: translateY(0);
         }
+        
+        .btn-outline-primary {
+            border-color: var(--primary);
+            color: var(--primary);
+        }
+        
+        .btn-outline-primary:hover {
+            background-color: var(--primary);
+            border-color: var(--primary);
+            color: white;
+        }
+        
+        .btn-outline-warning {
+            border-color: #f59e0b;
+            color: #f59e0b;
+        }
+        
+        .btn-outline-warning:hover {
+            background-color: #f59e0b;
+            border-color: #f59e0b;
+            color: white;
+        }
+        
+        .btn-warning {
+            background-color: #f59e0b;
+            border-color: #f59e0b;
+            color: white;
+        }
+        
+        .btn-warning:hover {
+            background-color: #d97706;
+            border-color: #d97706;
+        }
+        
+        /* Mode Switcher in Sidebar */
+        .sidebar-mode-switcher {
+            margin-top: 12px;
+            margin-bottom: 12px;
+            padding: 12px;
+            background: var(--dark-card);
+            border: 2px solid var(--border-color);
+            border-radius: 12px;
+        }
+        
+        .sidebar-mode-switcher.demo-mode {
+            border-color: #fbbf24;
+            background: rgba(251, 191, 36, 0.05);
+        }
+        
+        .sidebar-mode-switcher.real-mode {
+            border-color: var(--primary);
+            background: rgba(16, 185, 129, 0.05);
+        }
+        
+        .mode-switcher-buttons {
+            display: flex;
+            gap: 8px;
+            margin-bottom: 10px;
+        }
+        
+        .mode-switch-btn {
+            flex: 1;
+            padding: 10px 12px;
+            border: 2px solid;
+            border-radius: 8px;
+            background: transparent;
+            color: var(--text-primary);
+            font-size: 0.85rem;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.3s;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 6px;
+            text-decoration: none;
+        }
+        
+        .mode-switch-btn.real-btn {
+            border-color: var(--primary);
+            color: var(--primary);
+        }
+        
+        .mode-switch-btn.real-btn:hover,
+        .mode-switch-btn.real-btn.active {
+            background: var(--primary);
+            color: white;
+            box-shadow: 0 4px 12px rgba(16, 185, 129, 0.3);
+        }
+        
+        .mode-switch-btn.demo-btn {
+            border-color: #fbbf24;
+            color: #fbbf24;
+        }
+        
+        .mode-switch-btn.demo-btn:hover,
+        .mode-switch-btn.demo-btn.active {
+            background: #fbbf24;
+            color: #1e293b;
+            box-shadow: 0 4px 12px rgba(251, 191, 36, 0.3);
+        }
+        
+        .mode-status-indicator {
+            text-align: center;
+            padding: 8px;
+            border-radius: 6px;
+            font-size: 0.8rem;
+            font-weight: 500;
+        }
+        
+        .mode-status-indicator.real {
+            background: rgba(16, 185, 129, 0.15);
+            color: #6ee7b7;
+            border: 1px solid var(--primary);
+        }
+        
+        .mode-status-indicator.demo {
+            background: rgba(251, 191, 36, 0.15);
+            color: #fde047;
+            border: 1px solid #fbbf24;
+        }
+        
+        /* Dashboard Link - Color based on mode */
+        .nav-link.dashboard-link.real-mode {
+            background: linear-gradient(135deg, var(--primary) 0%, var(--primary-dark) 100%) !important;
+        }
+        
+        .nav-link.dashboard-link.demo-mode {
+            background: linear-gradient(135deg, #fbbf24 0%, #f59e0b 100%) !important;
+        }
+        
+        /* Demo Mode Theme Override */
+        body.demo-mode-active {
+            --primary: #fbbf24;
+            --primary-dark: #f59e0b;
+        }
+        
+        body.demo-mode-active .sidebar {
+            border-right-color: #fbbf24;
+        }
+        
+        body.demo-mode-active .nav-link.active {
+            background: linear-gradient(135deg, #fbbf24 0%, #f59e0b 100%) !important;
+        }
+        
+        body.demo-mode-active .btn-primary {
+            background-color: #fbbf24;
+            border-color: #fbbf24;
+        }
+        
+        body.demo-mode-active .btn-primary:hover {
+            background-color: #f59e0b;
+            border-color: #f59e0b;
+        }
+        
+        body.demo-mode-active .card-dark {
+            border-color: rgba(251, 191, 36, 0.3);
+        }
+        
+        body.demo-mode-active .top-bar {
+            border-bottom-color: rgba(251, 191, 36, 0.2);
+        }
     </style>
 </head>
-<body>
+<body class="<?php echo $is_demo ? 'demo-mode-active' : ''; ?>">
     <!-- Top Navigation Bar -->
     <nav class="navbar navbar-expand-lg navbar-light sticky-top top-navbar">
         <div class="container">
@@ -1539,15 +1534,45 @@ try {
         
         <ul class="nav-menu">
             <li class="nav-item">
-                <a href="dashboard.php" class="nav-link active dashboard-link">
+                <a href="dashboard.php" class="nav-link active dashboard-link <?php echo $is_demo ? 'demo-mode' : 'real-mode'; ?>">
                     <i class="fas fa-th-large"></i>
                     <span>Dashboard</span>
                 </a>
             </li>
             <li class="nav-item">
+                <div class="sidebar-mode-switcher <?php echo $is_demo ? 'demo-mode' : 'real-mode'; ?>">
+                    <div class="mode-switcher-buttons">
+                        <a href="dashboard.php?mode=real" class="mode-switch-btn real-btn <?php echo !$is_demo ? 'active' : ''; ?>">
+                            <i class="fas fa-check-circle"></i>
+                            <span>Real</span>
+                        </a>
+                        <a href="dashboard.php?mode=demo" class="mode-switch-btn demo-btn <?php echo $is_demo ? 'active' : ''; ?>">
+                            <i class="fas fa-flask"></i>
+                            <span>Demo</span>
+                        </a>
+                    </div>
+                    <div class="mode-status-indicator <?php echo $is_demo ? 'demo' : 'real'; ?>">
+                        <i class="fas fa-<?php echo $is_demo ? 'flask' : 'check-circle'; ?> me-1"></i>
+                        <?php echo $is_demo ? 'Demo Mode Active' : 'Real Mode Active'; ?>
+                    </div>
+                </div>
+            </li>
+            <li class="nav-item">
                 <a href="journal.php" class="nav-link">
                     <i class="fas fa-book"></i>
                     <span>Journal</span>
+                </a>
+            </li>
+            <li class="nav-item">
+                <a href="accounts.php" class="nav-link">
+                    <i class="fas fa-wallet"></i>
+                    <span>Trading Accounts</span>
+                </a>
+            </li>
+            <li class="nav-item">
+                <a href="mt5_history.php" class="nav-link">
+                    <i class="fas fa-history"></i>
+                    <span>MT5 History</span>
                 </a>
             </li>
             <li class="nav-item">
@@ -1627,105 +1652,16 @@ try {
 
         <!-- Dashboard Header -->
         <div class="dashboard-header">
-            <h1 class="dashboard-title">Welcome back, <?php echo htmlspecialchars($user['username']); ?>! 👋</h1>
-            <p class="dashboard-subtitle">Track live market prices and stay motivated on your trading journey.</p>
-        </div>
-
-        <!-- Live Market Prices -->
-        <div class="row g-4 mb-4">
-            <div class="col-md-4 col-sm-6">
-                <div class="price-card gold-card">
-                    <div class="price-card-header">
-                        <div class="price-card-icon gold-icon">
-                            <i class="fas fa-coins"></i>
-                        </div>
-                        <div class="price-card-title">
-                            <h5>Gold (XAU/USD)</h5>
-                            <span class="price-label">Live Spot Price</span>
-                        </div>
-                    </div>
-                    <div class="tradingview-widget-wrapper">
-                        <div class="tradingview-widget-container" style="height: 180px;">
-                            <div class="tradingview-widget-container__widget"></div>
-                            <script type="text/javascript" src="https://s3.tradingview.com/external-embedding/embed-widget-mini-symbol-overview.js" async>
-                            {
-                            "symbol": "OANDA:XAUUSD",
-                            "chartOnly": false,
-                            "dateRange": "1D",
-                            "trendLineColor": "rgba(255, 152, 0, 1)",
-                            "noTimeScale": false,
-                            "colorTheme": "dark",
-                            "isTransparent": true,
-                            "locale": "en",
-                            "width": "100%",
-                            "autosize": true,
-                            "height": "100%"
-                            }
-                            </script>
-                        </div>
-                    </div>
+            <div class="d-flex justify-content-between align-items-center mb-3">
+                <div>
+                    <h1 class="dashboard-title">Welcome back, <?php echo htmlspecialchars($user['username']); ?>! 👋</h1>
+                    <p class="dashboard-subtitle">Track live market prices and stay motivated on your trading journey.</p>
+                </div>
+                <div>
+                    <?php echo get_mode_badge(); ?>
                 </div>
             </div>
             
-            <div class="col-md-4 col-sm-6">
-                <div class="price-card nepse-card">
-                    <div class="price-card-header">
-                        <div class="price-card-icon nepse-icon">
-                            <i class="fas fa-chart-line"></i>
-                        </div>
-                        <div class="price-card-title">
-                            <h5>NEPSE Index</h5>
-                            <span class="price-label">Nepal Stock Exchange</span>
-                        </div>
-                    </div>
-                    <div class="price-value" id="nepsePrice">
-                        <span class="loading-spinner"><i class="fas fa-spinner fa-spin"></i> Loading...</span>
-                    </div>
-                    <div class="price-change" id="nepseChange">
-                        <span class="loading-spinner"><i class="fas fa-spinner fa-spin"></i></span>
-                    </div>
-                    <div class="price-update-time" id="nepseUpdateTime"></div>
-                    <div style="margin-top: 8px;">
-                        <a href="https://nepsealpha.com/live-market" target="_blank" style="color: var(--text-secondary); font-size: 0.75rem; text-decoration: none;">
-                            <i class="fas fa-external-link-alt"></i> View Live Market
-                        </a>
-                    </div>
-                </div>
-            </div>
-            
-            <div class="col-md-4 col-sm-6">
-                <div class="price-card btc-card">
-                    <div class="price-card-header">
-                        <div class="price-card-icon btc-icon">
-                            <i class="fab fa-bitcoin"></i>
-                        </div>
-                        <div class="price-card-title">
-                            <h5>Bitcoin (BTC)</h5>
-                            <span class="price-label">Cryptocurrency</span>
-                        </div>
-                    </div>
-                    <div class="tradingview-widget-wrapper">
-                        <div class="tradingview-widget-container" style="height: 180px;">
-                            <div class="tradingview-widget-container__widget"></div>
-                            <script type="text/javascript" src="https://s3.tradingview.com/external-embedding/embed-widget-mini-symbol-overview.js" async>
-                            {
-                            "symbol": "BINANCE:BTCUSDT",
-                            "chartOnly": false,
-                            "dateRange": "1D",
-                            "trendLineColor": "rgba(255, 152, 0, 1)",
-                            "noTimeScale": false,
-                            "colorTheme": "dark",
-                            "isTransparent": true,
-                            "locale": "en",
-                            "width": "100%",
-                            "autosize": true,
-                            "height": "100%"
-                            }
-                            </script>
-                        </div>
-                    </div>
-                </div>
-            </div>
         </div>
 
         <!-- Motivation Section -->
@@ -1972,90 +1908,14 @@ try {
             }, observerOptions);
             
             // Observe all cards
-            document.querySelectorAll('.price-card, .motivation-card').forEach(card => {
+            document.querySelectorAll('.motivation-card').forEach(card => {
                 card.style.opacity = '0';
                 card.style.transform = 'translateY(20px)';
                 card.style.transition = 'opacity 0.6s ease-out, transform 0.6s ease-out';
                 observer.observe(card);
             });
             
-            // Load NEPSE price (Gold and Bitcoin use TradingView widgets)
-            loadNEPSEPrice();
-            // Update NEPSE price every 30 seconds
-            setInterval(loadNEPSEPrice, 30000);
-            
-            // Hide TradingView copyright/logo after widgets load
-            setTimeout(() => {
-                const widgets = document.querySelectorAll('.tradingview-widget-container');
-                widgets.forEach(widget => {
-                    // Hide copyright links
-                    const links = widget.querySelectorAll('a[href*="tradingview.com"]');
-                    links.forEach(link => {
-                        link.style.display = 'none';
-                        link.parentElement && (link.parentElement.style.display = 'none');
-                    });
-                    
-                    // Hide copyright text
-                    const copyright = widget.querySelector('.tradingview-widget-copyright');
-                    if (copyright) {
-                        copyright.style.display = 'none';
-                    }
-                    
-                    // Hide any text containing "TradingView"
-                    const allElements = widget.querySelectorAll('*');
-                    allElements.forEach(el => {
-                        if (el.textContent && el.textContent.includes('TradingView') && el.tagName !== 'SCRIPT') {
-                            el.style.display = 'none';
-                        }
-                    });
-                });
-            }, 2000);
-            
-            // Also hide on iframe load using MutationObserver
-            const tvObserver = new MutationObserver(() => {
-                document.querySelectorAll('.tradingview-widget-container a[href*="tradingview.com"]').forEach(el => {
-                    el.style.display = 'none';
-                    el.parentElement && (el.parentElement.style.display = 'none');
-                });
-                document.querySelectorAll('.tradingview-widget-copyright').forEach(el => {
-                    el.style.display = 'none';
-                });
-            });
-            
-            document.querySelectorAll('.tradingview-widget-container').forEach(container => {
-                tvObserver.observe(container, { childList: true, subtree: true });
-            });
         });
-        
-        // Load NEPSE Index Price
-        function loadNEPSEPrice() {
-            // NEPSE Index - Fetching from our backend API
-            fetch('../api/nepse.php')
-                .then(response => response.json())
-                .then(data => {
-                    if (data && data.success) {
-                        const value = parseFloat(data.index).toFixed(2);
-                        const change = parseFloat(data.change || 0).toFixed(2);
-                        const changePercent = parseFloat(data.changePercent || 0).toFixed(2);
-                        const isPositive = change >= 0;
-                        
-                        document.getElementById('nepsePrice').innerHTML = value;
-                        document.getElementById('nepseChange').innerHTML = `
-                            <i class="fas fa-arrow-${isPositive ? 'up' : 'down'}"></i>
-                            <span class="${isPositive ? 'positive' : 'negative'}">${isPositive ? '+' : ''}${change} (${isPositive ? '+' : ''}${changePercent}%)</span>
-                        `;
-                        document.getElementById('nepseUpdateTime').textContent = 'Updated: ' + new Date().toLocaleTimeString();
-                    } else {
-                        throw new Error('NEPSE data not available');
-                    }
-                })
-                .catch(() => {
-                    // Fallback: Show link to nepsealpha.com
-                    document.getElementById('nepsePrice').innerHTML = '<a href="https://nepsealpha.com/live-market" target="_blank" style="color: var(--primary); text-decoration: none;">View Live Market →</a>';
-                    document.getElementById('nepseChange').innerHTML = '<span style="color: var(--text-secondary);">Click to view</span>';
-                    document.getElementById('nepseUpdateTime').textContent = 'Visit nepsealpha.com for live data';
-                });
-        }
         
         // Change Motivation Function
         function changeMotivation() {
@@ -2103,9 +1963,6 @@ try {
         }
         
     </script>
-    
-    <!-- AI Chat Widget -->
-    <?php include '../includes/ai-chat-widget.php'; ?>
 </body>
 </html>
 

@@ -6,6 +6,10 @@ if (!isset($_SESSION['user_id'])) {
 }
 
 require_once __DIR__.'/../config/database.php';
+require_once __DIR__.'/dashboard_mode.php';
+
+$is_demo = is_demo_mode();
+$mode_name = get_mode_name();
 
 $message = '';
 $message_type = '';
@@ -243,6 +247,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action']) && $_POST['
         $platform_details = trim($_POST['platform_details'] ?? '');
         $withdrawal_date = $_POST['withdrawal_date'];
         $notes = trim($_POST['notes'] ?? '');
+        $balance_after_withdrawal = !empty($_POST['balance_after_withdrawal']) ? floatval($_POST['balance_after_withdrawal']) : null;
         
         $stmt = $pdo->prepare("
             INSERT INTO account_withdrawals 
@@ -260,45 +265,57 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action']) && $_POST['
             $notes
         ]);
         
-        // Update account current balance (recalculate with all trades and withdrawals)
+        // Update account current balance
+        // If user provided balance_after_withdrawal, use that directly
+        // Otherwise, calculate it automatically
         if ($account_id) {
-            // Get account initial balance
-            $account_stmt = $pdo->prepare("SELECT initial_balance FROM trading_accounts WHERE id = ? AND user_id = ?");
-            $account_stmt->execute([$account_id, $_SESSION['user_id']]);
-            $account_data = $account_stmt->fetch(PDO::FETCH_ASSOC);
-            
-            if ($account_data) {
-                $initial_balance = floatval($account_data['initial_balance']);
-                
-                // Get total profit/loss from trades
-                $pl_stmt = $pdo->prepare("
-                    SELECT COALESCE(SUM(profit_loss), 0) as total_pl 
-                    FROM trading_journal 
-                    WHERE account_id = ? AND profit_loss IS NOT NULL
-                ");
-                $pl_stmt->execute([$account_id]);
-                $pl_data = $pl_stmt->fetch(PDO::FETCH_ASSOC);
-                $total_pl = floatval($pl_data['total_pl'] ?? 0);
-                
-                // Get total withdrawals
-                $withdrawals_stmt = $pdo->prepare("
-                    SELECT COALESCE(SUM(withdrawal_amount), 0) as total_withdrawals 
-                    FROM account_withdrawals 
-                    WHERE account_id = ?
-                ");
-                $withdrawals_stmt->execute([$account_id]);
-                $withdrawals_data = $withdrawals_stmt->fetch(PDO::FETCH_ASSOC);
-                $total_withdrawals = floatval($withdrawals_data['total_withdrawals'] ?? 0);
-                
-                // Calculate new balance
-                $new_balance = $initial_balance + $total_pl - $total_withdrawals;
-                
+            if ($balance_after_withdrawal !== null) {
+                // Use the manual balance provided by user
                 $update_stmt = $pdo->prepare("
                     UPDATE trading_accounts 
                     SET current_balance = ?
                     WHERE id = ? AND user_id = ?
                 ");
-                $update_stmt->execute([$new_balance, $account_id, $_SESSION['user_id']]);
+                $update_stmt->execute([$balance_after_withdrawal, $account_id, $_SESSION['user_id']]);
+            } else {
+                // Auto-calculate balance (fallback)
+                $account_stmt = $pdo->prepare("SELECT initial_balance FROM trading_accounts WHERE id = ? AND user_id = ?");
+                $account_stmt->execute([$account_id, $_SESSION['user_id']]);
+                $account_data = $account_stmt->fetch(PDO::FETCH_ASSOC);
+                
+                if ($account_data) {
+                    $initial_balance = floatval($account_data['initial_balance']);
+                    
+                    // Get total profit/loss from trades
+                    $pl_stmt = $pdo->prepare("
+                        SELECT COALESCE(SUM(profit_loss), 0) as total_pl 
+                        FROM trading_journal 
+                        WHERE account_id = ? AND profit_loss IS NOT NULL
+                    ");
+                    $pl_stmt->execute([$account_id]);
+                    $pl_data = $pl_stmt->fetch(PDO::FETCH_ASSOC);
+                    $total_pl = floatval($pl_data['total_pl'] ?? 0);
+                    
+                    // Get total withdrawals
+                    $withdrawals_stmt = $pdo->prepare("
+                        SELECT COALESCE(SUM(withdrawal_amount), 0) as total_withdrawals 
+                        FROM account_withdrawals 
+                        WHERE account_id = ?
+                    ");
+                    $withdrawals_stmt->execute([$account_id]);
+                    $withdrawals_data = $withdrawals_stmt->fetch(PDO::FETCH_ASSOC);
+                    $total_withdrawals = floatval($withdrawals_data['total_withdrawals'] ?? 0);
+                    
+                    // Calculate new balance
+                    $new_balance = $initial_balance + $total_pl - $total_withdrawals;
+                    
+                    $update_stmt = $pdo->prepare("
+                        UPDATE trading_accounts 
+                        SET current_balance = ?
+                        WHERE id = ? AND user_id = ?
+                    ");
+                    $update_stmt->execute([$new_balance, $account_id, $_SESSION['user_id']]);
+                }
             }
         }
         
@@ -389,20 +406,39 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action']) && $_POST['
             }
         }
         
-        $stmt = $pdo->prepare("
-            INSERT INTO trading_journal 
-            (user_id, account_id, symbol, trade_type, quantity, lot, entry_price, exit_price, stop_loss, take_profit,
-             entry_time, exit_time, trade_date, session_type, risk_percent, r_multiple, strategy, setup_type,
-             emotion_before, emotion_during, emotion_after, mistake_tags, notes, screenshot_path, profit_loss, trade_status) 
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-        ");
-        $stmt->execute([
-            $_SESSION['user_id'], $account_id, $symbol, $trade_type, 
-            $quantity, $lot, $entry_price, $exit_price, $stop_loss, $take_profit,
-            $entry_time, $exit_time, $trade_date, $session_type, $risk_percent, $r_multiple,
-            $strategy, $setup_type, $emotion_before, $emotion_during, $emotion_after,
-            $mistake_tags, $notes, $screenshot_path, $profit_loss, $trade_status
-        ]);
+        // Check if is_demo column exists
+        $columns_check = $pdo->query("SHOW COLUMNS FROM trading_journal LIKE 'is_demo'")->fetch();
+        if ($columns_check) {
+            $stmt = $pdo->prepare("
+                INSERT INTO trading_journal 
+                (user_id, is_demo, account_id, symbol, trade_type, quantity, lot, entry_price, exit_price, stop_loss, take_profit,
+                 entry_time, exit_time, trade_date, session_type, risk_percent, r_multiple, strategy, setup_type,
+                 emotion_before, emotion_during, emotion_after, mistake_tags, notes, screenshot_path, profit_loss, trade_status) 
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            ");
+            $stmt->execute([
+                $_SESSION['user_id'], $is_demo ? 1 : 0, $account_id, $symbol, $trade_type, 
+                $quantity, $lot, $entry_price, $exit_price, $stop_loss, $take_profit,
+                $entry_time, $exit_time, $trade_date, $session_type, $risk_percent, $r_multiple,
+                $strategy, $setup_type, $emotion_before, $emotion_during, $emotion_after,
+                $mistake_tags, $notes, $screenshot_path, $profit_loss, $trade_status
+            ]);
+        } else {
+            $stmt = $pdo->prepare("
+                INSERT INTO trading_journal 
+                (user_id, account_id, symbol, trade_type, quantity, lot, entry_price, exit_price, stop_loss, take_profit,
+                 entry_time, exit_time, trade_date, session_type, risk_percent, r_multiple, strategy, setup_type,
+                 emotion_before, emotion_during, emotion_after, mistake_tags, notes, screenshot_path, profit_loss, trade_status) 
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            ");
+            $stmt->execute([
+                $_SESSION['user_id'], $account_id, $symbol, $trade_type, 
+                $quantity, $lot, $entry_price, $exit_price, $stop_loss, $take_profit,
+                $entry_time, $exit_time, $trade_date, $session_type, $risk_percent, $r_multiple,
+                $strategy, $setup_type, $emotion_before, $emotion_during, $emotion_after,
+                $mistake_tags, $notes, $screenshot_path, $profit_loss, $trade_status
+            ]);
+        }
         
         // Update account current balance (including withdrawals)
         if ($account_id && $profit_loss !== null) {
@@ -638,20 +674,38 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action']) && $_POST['
                 }
                 
                 // Insert into database
-                $stmt = $pdo->prepare("
-                    INSERT INTO trading_journal 
-                    (user_id, account_id, symbol, trade_type, quantity, lot, entry_price, exit_price, stop_loss, take_profit,
-                     entry_time, exit_time, trade_date, session_type, risk_percent, r_multiple, strategy, setup_type,
-                     emotion_before, emotion_during, emotion_after, mistake_tags, notes, screenshot_path, profit_loss, trade_status) 
-                    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-                ");
-                $stmt->execute([
-                    $_SESSION['user_id'], $account_id, $symbol, $trade_type, 
-                    $quantity, $lot, $entry_price, $exit_price, $stop_loss, $take_profit,
-                    $entry_time, $exit_time, $parsed_date, $session_type, $risk_percent, $r_multiple,
-                    $strategy, $setup_type, $emotion_before, $emotion_during, $emotion_after,
-                    null, $notes, null, $profit_loss, $trade_status
-                ]);
+                $columns_check = $pdo->query("SHOW COLUMNS FROM trading_journal LIKE 'is_demo'")->fetch();
+                if ($columns_check) {
+                    $stmt = $pdo->prepare("
+                        INSERT INTO trading_journal 
+                        (user_id, is_demo, account_id, symbol, trade_type, quantity, lot, entry_price, exit_price, stop_loss, take_profit,
+                         entry_time, exit_time, trade_date, session_type, risk_percent, r_multiple, strategy, setup_type,
+                         emotion_before, emotion_during, emotion_after, mistake_tags, notes, screenshot_path, profit_loss, trade_status) 
+                        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                    ");
+                    $stmt->execute([
+                        $_SESSION['user_id'], $is_demo ? 1 : 0, $account_id, $symbol, $trade_type, 
+                        $quantity, $lot, $entry_price, $exit_price, $stop_loss, $take_profit,
+                        $entry_time, $exit_time, $parsed_date, $session_type, $risk_percent, $r_multiple,
+                        $strategy, $setup_type, $emotion_before, $emotion_during, $emotion_after,
+                        null, $notes, null, $profit_loss, $trade_status
+                    ]);
+                } else {
+                    $stmt = $pdo->prepare("
+                        INSERT INTO trading_journal 
+                        (user_id, account_id, symbol, trade_type, quantity, lot, entry_price, exit_price, stop_loss, take_profit,
+                         entry_time, exit_time, trade_date, session_type, risk_percent, r_multiple, strategy, setup_type,
+                         emotion_before, emotion_during, emotion_after, mistake_tags, notes, screenshot_path, profit_loss, trade_status) 
+                        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                    ");
+                    $stmt->execute([
+                        $_SESSION['user_id'], $account_id, $symbol, $trade_type, 
+                        $quantity, $lot, $entry_price, $exit_price, $stop_loss, $take_profit,
+                        $entry_time, $exit_time, $parsed_date, $session_type, $risk_percent, $r_multiple,
+                        $strategy, $setup_type, $emotion_before, $emotion_during, $emotion_after,
+                        null, $notes, null, $profit_loss, $trade_status
+                    ]);
+                }
                 
                 $success_count++;
                 
@@ -888,19 +942,33 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action']) && $_POST['
 $selected_account_id = isset($_GET['account_id']) ? intval($_GET['account_id']) : null;
 $active_tab = isset($_GET['tab']) ? $_GET['tab'] : 'trades';
 
-// Fetch all accounts (include challenge_fee if column exists)
+// Fetch all accounts (filtered by Real/Demo mode, include challenge_fee if column exists)
 $columns_check_accounts = $pdo->query("SHOW COLUMNS FROM trading_accounts LIKE 'challenge_fee'")->fetch();
-if ($columns_check_accounts) {
+$columns_check_demo = $pdo->query("SHOW COLUMNS FROM trading_accounts LIKE 'is_demo'")->fetch();
+if ($columns_check_accounts && $columns_check_demo) {
+    $accounts_stmt = $pdo->prepare("SELECT *, COALESCE(challenge_fee, 0) as challenge_fee FROM trading_accounts WHERE user_id = ? AND is_demo = ? ORDER BY created_at DESC");
+    $accounts_stmt->execute([$_SESSION['user_id'], $is_demo]);
+} elseif ($columns_check_demo) {
+    $accounts_stmt = $pdo->prepare("SELECT *, 0 as challenge_fee FROM trading_accounts WHERE user_id = ? AND is_demo = ? ORDER BY created_at DESC");
+    $accounts_stmt->execute([$_SESSION['user_id'], $is_demo]);
+} elseif ($columns_check_accounts) {
     $accounts_stmt = $pdo->prepare("SELECT *, COALESCE(challenge_fee, 0) as challenge_fee FROM trading_accounts WHERE user_id = ? ORDER BY created_at DESC");
+    $accounts_stmt->execute([$_SESSION['user_id']]);
 } else {
     $accounts_stmt = $pdo->prepare("SELECT *, 0 as challenge_fee FROM trading_accounts WHERE user_id = ? ORDER BY created_at DESC");
+    $accounts_stmt->execute([$_SESSION['user_id']]);
 }
-$accounts_stmt->execute([$_SESSION['user_id']]);
 $accounts = $accounts_stmt->fetchAll(PDO::FETCH_ASSOC);
 
-// Build filter conditions for trades
+// Build filter conditions for trades (include is_demo filter)
+$columns_check_demo = $pdo->query("SHOW COLUMNS FROM trading_journal LIKE 'is_demo'")->fetch();
 $filter_conditions = ["j.user_id = ?"];
 $filter_params = [$_SESSION['user_id']];
+
+if ($columns_check_demo) {
+    $filter_conditions[] = "j.is_demo = ?";
+    $filter_params[] = $is_demo ? 1 : 0;
+}
 
 if ($selected_account_id) {
     $filter_conditions[] = "j.account_id = ?";
@@ -954,23 +1022,44 @@ $account_stats = null;
 $all_stats = null;
 
 if ($selected_account_id) {
-    $stats_stmt = $pdo->prepare("
-        SELECT 
-            a.*,
-            COUNT(j.id) as total_trades,
-            SUM(CASE WHEN j.profit_loss > 0 THEN 1 ELSE 0 END) as winning_trades,
-            SUM(CASE WHEN j.profit_loss < 0 THEN 1 ELSE 0 END) as losing_trades,
-            COALESCE(SUM(j.profit_loss), 0) as total_pl,
-            COALESCE(AVG(CASE WHEN j.profit_loss > 0 THEN j.profit_loss END), 0) as avg_win,
-            COALESCE(AVG(CASE WHEN j.profit_loss < 0 THEN j.profit_loss END), 0) as avg_loss,
-            COALESCE(MAX(j.profit_loss), 0) as best_trade,
-            COALESCE(MIN(j.profit_loss), 0) as worst_trade
-        FROM trading_accounts a
-        LEFT JOIN trading_journal j ON a.id = j.account_id
-        WHERE a.id = ? AND a.user_id = ?
-        GROUP BY a.id
-    ");
-    $stats_stmt->execute([$selected_account_id, $_SESSION['user_id']]);
+    $columns_check_demo = $pdo->query("SHOW COLUMNS FROM trading_journal LIKE 'is_demo'")->fetch();
+    if ($columns_check_demo) {
+        $stats_stmt = $pdo->prepare("
+            SELECT 
+                a.*,
+                COUNT(j.id) as total_trades,
+                SUM(CASE WHEN j.profit_loss > 0 THEN 1 ELSE 0 END) as winning_trades,
+                SUM(CASE WHEN j.profit_loss < 0 THEN 1 ELSE 0 END) as losing_trades,
+                COALESCE(SUM(j.profit_loss), 0) as total_pl,
+                COALESCE(AVG(CASE WHEN j.profit_loss > 0 THEN j.profit_loss END), 0) as avg_win,
+                COALESCE(AVG(CASE WHEN j.profit_loss < 0 THEN j.profit_loss END), 0) as avg_loss,
+                COALESCE(MAX(j.profit_loss), 0) as best_trade,
+                COALESCE(MIN(j.profit_loss), 0) as worst_trade
+            FROM trading_accounts a
+            LEFT JOIN trading_journal j ON a.id = j.account_id AND j.is_demo = ?
+            WHERE a.id = ? AND a.user_id = ?
+            GROUP BY a.id
+        ");
+        $stats_stmt->execute([$is_demo ? 1 : 0, $selected_account_id, $_SESSION['user_id']]);
+    } else {
+        $stats_stmt = $pdo->prepare("
+            SELECT 
+                a.*,
+                COUNT(j.id) as total_trades,
+                SUM(CASE WHEN j.profit_loss > 0 THEN 1 ELSE 0 END) as winning_trades,
+                SUM(CASE WHEN j.profit_loss < 0 THEN 1 ELSE 0 END) as losing_trades,
+                COALESCE(SUM(j.profit_loss), 0) as total_pl,
+                COALESCE(AVG(CASE WHEN j.profit_loss > 0 THEN j.profit_loss END), 0) as avg_win,
+                COALESCE(AVG(CASE WHEN j.profit_loss < 0 THEN j.profit_loss END), 0) as avg_loss,
+                COALESCE(MAX(j.profit_loss), 0) as best_trade,
+                COALESCE(MIN(j.profit_loss), 0) as worst_trade
+            FROM trading_accounts a
+            LEFT JOIN trading_journal j ON a.id = j.account_id
+            WHERE a.id = ? AND a.user_id = ?
+            GROUP BY a.id
+        ");
+        $stats_stmt->execute([$selected_account_id, $_SESSION['user_id']]);
+    }
     $account_stats = $stats_stmt->fetch(PDO::FETCH_ASSOC);
     
     if ($account_stats && $account_stats['total_trades'] > 0) {
@@ -978,44 +1067,87 @@ if ($selected_account_id) {
     }
 }
 
-// Fetch symbol performance stats
-$symbol_stats_stmt = $pdo->prepare("
-    SELECT 
-        symbol,
-        COUNT(*) as total_trades,
-        SUM(CASE WHEN profit_loss > 0 THEN 1 ELSE 0 END) as wins,
-        SUM(CASE WHEN profit_loss < 0 THEN 1 ELSE 0 END) as losses,
-        COALESCE(SUM(profit_loss), 0) as total_pl,
-        COALESCE(AVG(profit_loss), 0) as avg_pl
-    FROM trading_journal
-    WHERE user_id = ? " . ($selected_account_id ? "AND account_id = ?" : "") . "
-    GROUP BY symbol
-    ORDER BY total_pl DESC
-");
-if ($selected_account_id) {
-    $symbol_stats_stmt->execute([$_SESSION['user_id'], $selected_account_id]);
+// Fetch symbol performance stats (filtered by is_demo)
+$columns_check_demo = $pdo->query("SHOW COLUMNS FROM trading_journal LIKE 'is_demo'")->fetch();
+if ($columns_check_demo) {
+    $symbol_stats_stmt = $pdo->prepare("
+        SELECT 
+            symbol,
+            COUNT(*) as total_trades,
+            SUM(CASE WHEN profit_loss > 0 THEN 1 ELSE 0 END) as wins,
+            SUM(CASE WHEN profit_loss < 0 THEN 1 ELSE 0 END) as losses,
+            COALESCE(SUM(profit_loss), 0) as total_pl,
+            COALESCE(AVG(profit_loss), 0) as avg_pl
+        FROM trading_journal
+        WHERE user_id = ? AND is_demo = ? " . ($selected_account_id ? "AND account_id = ?" : "") . "
+        GROUP BY symbol
+        ORDER BY total_pl DESC
+    ");
+    if ($selected_account_id) {
+        $symbol_stats_stmt->execute([$_SESSION['user_id'], $is_demo ? 1 : 0, $selected_account_id]);
+    } else {
+        $symbol_stats_stmt->execute([$_SESSION['user_id'], $is_demo ? 1 : 0]);
+    }
 } else {
-    $symbol_stats_stmt->execute([$_SESSION['user_id']]);
+    $symbol_stats_stmt = $pdo->prepare("
+        SELECT 
+            symbol,
+            COUNT(*) as total_trades,
+            SUM(CASE WHEN profit_loss > 0 THEN 1 ELSE 0 END) as wins,
+            SUM(CASE WHEN profit_loss < 0 THEN 1 ELSE 0 END) as losses,
+            COALESCE(SUM(profit_loss), 0) as total_pl,
+            COALESCE(AVG(profit_loss), 0) as avg_pl
+        FROM trading_journal
+        WHERE user_id = ? " . ($selected_account_id ? "AND account_id = ?" : "") . "
+        GROUP BY symbol
+        ORDER BY total_pl DESC
+    ");
+    if ($selected_account_id) {
+        $symbol_stats_stmt->execute([$_SESSION['user_id'], $selected_account_id]);
+    } else {
+        $symbol_stats_stmt->execute([$_SESSION['user_id']]);
+    }
 }
 $symbol_stats = $symbol_stats_stmt->fetchAll(PDO::FETCH_ASSOC);
 
-// Fetch session performance stats
-$session_stats_stmt = $pdo->prepare("
-    SELECT 
-        COALESCE(session_type, 'Unknown') as session_type,
-        COUNT(*) as total_trades,
-        SUM(CASE WHEN profit_loss > 0 THEN 1 ELSE 0 END) as wins,
-        SUM(CASE WHEN profit_loss < 0 THEN 1 ELSE 0 END) as losses,
-        COALESCE(SUM(profit_loss), 0) as total_pl
-    FROM trading_journal
-    WHERE user_id = ? " . ($selected_account_id ? "AND account_id = ?" : "") . "
-    GROUP BY session_type
-    ORDER BY total_pl DESC
-");
-if ($selected_account_id) {
-    $session_stats_stmt->execute([$_SESSION['user_id'], $selected_account_id]);
+// Fetch session performance stats (filtered by is_demo)
+$columns_check_demo = $pdo->query("SHOW COLUMNS FROM trading_journal LIKE 'is_demo'")->fetch();
+if ($columns_check_demo) {
+    $session_stats_stmt = $pdo->prepare("
+        SELECT 
+            COALESCE(session_type, 'Unknown') as session_type,
+            COUNT(*) as total_trades,
+            SUM(CASE WHEN profit_loss > 0 THEN 1 ELSE 0 END) as wins,
+            SUM(CASE WHEN profit_loss < 0 THEN 1 ELSE 0 END) as losses,
+            COALESCE(SUM(profit_loss), 0) as total_pl
+        FROM trading_journal
+        WHERE user_id = ? AND is_demo = ? " . ($selected_account_id ? "AND account_id = ?" : "") . "
+        GROUP BY session_type
+        ORDER BY total_pl DESC
+    ");
+    if ($selected_account_id) {
+        $session_stats_stmt->execute([$_SESSION['user_id'], $is_demo ? 1 : 0, $selected_account_id]);
+    } else {
+        $session_stats_stmt->execute([$_SESSION['user_id'], $is_demo ? 1 : 0]);
+    }
 } else {
-    $session_stats_stmt->execute([$_SESSION['user_id']]);
+    $session_stats_stmt = $pdo->prepare("
+        SELECT 
+            COALESCE(session_type, 'Unknown') as session_type,
+            COUNT(*) as total_trades,
+            SUM(CASE WHEN profit_loss > 0 THEN 1 ELSE 0 END) as wins,
+            SUM(CASE WHEN profit_loss < 0 THEN 1 ELSE 0 END) as losses,
+            COALESCE(SUM(profit_loss), 0) as total_pl
+        FROM trading_journal
+        WHERE user_id = ? " . ($selected_account_id ? "AND account_id = ?" : "") . "
+        GROUP BY session_type
+        ORDER BY total_pl DESC
+    ");
+    if ($selected_account_id) {
+        $session_stats_stmt->execute([$_SESSION['user_id'], $selected_account_id]);
+    } else {
+        $session_stats_stmt->execute([$_SESSION['user_id']]);
+    }
 }
 $session_stats = $session_stats_stmt->fetchAll(PDO::FETCH_ASSOC);
 
@@ -1863,7 +1995,7 @@ $reviews = $reviews_stmt->fetchAll(PDO::FETCH_ASSOC);
         }
     </style>
 </head>
-<body>
+<body class="<?php echo $is_demo ? 'demo-mode-active' : ''; ?>">
     <!-- Top Navigation Bar -->
     <nav class="navbar navbar-expand-lg navbar-light sticky-top top-navbar">
         <div class="container">
@@ -1935,8 +2067,18 @@ $reviews = $reviews_stmt->fetchAll(PDO::FETCH_ASSOC);
             <!-- Header -->
             <div class="d-flex justify-content-between align-items-center mb-4">
                 <div>
-                    <h1 class="h2">Trading Journal</h1>
-                    <p class="text-muted">Manage accounts and track all your trades</p>
+                    <div class="d-flex align-items-center gap-2 mb-2">
+                        <h1 class="h2 mb-0">Trading Journal</h1>
+                        <?php echo get_mode_badge(); ?>
+                    </div>
+                    <p class="text-muted">Manage <?php echo strtolower($mode_name); ?> accounts and track all your <?php echo strtolower($mode_name); ?> trades</p>
+                    <div class="mt-2">
+                        <small class="text-muted">
+                            <a href="dashboard.php?mode=<?php echo $is_demo ? 'real' : 'demo'; ?>" class="text-primary text-decoration-none">
+                                <i class="fas fa-exchange-alt me-1"></i>Switch to <?php echo $is_demo ? 'Real' : 'Demo'; ?> Dashboard
+                            </a>
+                        </small>
+                    </div>
                 </div>
                 <div>
                     <button class="btn btn-outline-primary me-2" data-bs-toggle="modal" data-bs-target="#createAccountModal">
@@ -3280,10 +3422,11 @@ GBPUSD,2024-01-16,sell,1.2650,1.2600,0.02,1.2700,1.2550,100.00</pre>
                                 }
                             }
                             ?>
-                            <div class="alert alert-info mb-3">
+                            <div class="alert alert-info mb-3" id="accountInfoBox">
                                 <strong>Account:</strong> <?php echo htmlspecialchars($selected_account['account_name'] ?? 'Selected Account'); ?>
                                 <br>
                                 <strong>Current Balance:</strong> <?php echo $selected_account['currency'] ?? 'USD'; ?> <?php echo number_format($selected_account['current_balance'] ?? 0, 2); ?>
+                                <input type="hidden" id="currentBalanceValue" value="<?php echo $selected_account['current_balance'] ?? 0; ?>">
                             </div>
                         <?php elseif (!empty($accounts)): ?>
                             <div class="mb-3">
@@ -3330,6 +3473,21 @@ GBPUSD,2024-01-16,sell,1.2650,1.2600,0.02,1.2700,1.2550,100.00</pre>
                                 <input type="date" class="form-control" name="withdrawal_date" value="<?php echo date('Y-m-d'); ?>" required>
                             </div>
                         </div>
+                        <?php if ($selected_account_id && isset($selected_account)): ?>
+                        <div class="mb-3">
+                            <label class="form-label">Balance After Withdrawal *</label>
+                            <div class="input-group">
+                                <span class="input-group-text"><?php echo $selected_account['currency'] ?? 'USD'; ?></span>
+                                <input type="number" step="0.01" class="form-control" name="balance_after_withdrawal" 
+                                       value="<?php echo number_format($selected_account['current_balance'] ?? 0, 2, '.', ''); ?>" 
+                                       placeholder="Enter actual balance after withdrawal" required>
+                            </div>
+                            <small class="text-muted">
+                                <i class="fas fa-info-circle me-1"></i>
+                                Enter the actual account balance after this withdrawal. This will update your account balance.
+                            </small>
+                        </div>
+                        <?php endif; ?>
                         <div class="mb-3">
                             <label class="form-label">Platform Details</label>
                             <input type="text" class="form-control" name="platform_details" placeholder="e.g., Bank name, Crypto wallet address, etc.">
@@ -3963,6 +4121,46 @@ GBPUSD,2024-01-16,sell,1.2650,1.2600,0.02,1.2700,1.2550,100.00</pre>
             // Note: Challenge fee and initial balance are separate for prop firms
             // Challenge fee = money paid to purchase challenge
             // Initial balance = challenge account value (e.g., $10,000)
+            
+            // Auto-calculate balance after withdrawal
+            const withdrawalModal = document.getElementById('addWithdrawalModal');
+            if (withdrawalModal) {
+                withdrawalModal.addEventListener('show.bs.modal', function() {
+                    const withdrawalAmountInput = document.querySelector('#addWithdrawalModal input[name="withdrawal_amount"]');
+                    const balanceAfterWithdrawalInput = document.querySelector('#addWithdrawalModal input[name="balance_after_withdrawal"]');
+                    const currentBalanceHidden = document.getElementById('currentBalanceValue');
+                    
+                    if (withdrawalAmountInput && balanceAfterWithdrawalInput) {
+                        // Get current balance from hidden input
+                        let currentBalance = 0;
+                        if (currentBalanceHidden) {
+                            currentBalance = parseFloat(currentBalanceHidden.value) || 0;
+                        } else if (balanceAfterWithdrawalInput.value) {
+                            currentBalance = parseFloat(balanceAfterWithdrawalInput.value) || 0;
+                        }
+                        
+                        // Store original value to detect manual changes
+                        let userModified = false;
+                        
+                        // Remove existing listeners to avoid duplicates
+                        const newWithdrawalInput = withdrawalAmountInput.cloneNode(true);
+                        withdrawalAmountInput.parentNode.replaceChild(newWithdrawalInput, withdrawalAmountInput);
+                        
+                        newWithdrawalInput.addEventListener('input', function() {
+                            if (!userModified && currentBalance !== 0) {
+                                const withdrawalAmount = parseFloat(this.value) || 0;
+                                const calculatedBalance = currentBalance - withdrawalAmount;
+                                balanceAfterWithdrawalInput.value = calculatedBalance.toFixed(2);
+                            }
+                        });
+                        
+                        // Track if user manually changes the balance
+                        balanceAfterWithdrawalInput.addEventListener('input', function() {
+                            userModified = true;
+                        });
+                    }
+                });
+            }
         });
         
         // View Trade Function
@@ -3981,8 +4179,5 @@ GBPUSD,2024-01-16,sell,1.2650,1.2600,0.02,1.2700,1.2550,100.00</pre>
             }
         }
     </script>
-    
-    <!-- AI Chat Widget -->
-    <?php include '../includes/ai-chat-widget.php'; ?>
 </body>
 </html>
