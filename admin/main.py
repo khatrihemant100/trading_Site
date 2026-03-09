@@ -13,6 +13,10 @@ from cryptography.fernet import Fernet
 from apscheduler.schedulers.background import BackgroundScheduler
 from apscheduler.triggers.interval import IntervalTrigger
 
+# --- Logging setup (must be before any logger usage) ---
+logging.basicConfig(level=logging.INFO)
+logger = logging.getLogger(__name__)
+
 # Try to import MT5 (optional - only if local terminal available)
 try:
     import MetaTrader5 as mt5
@@ -34,10 +38,6 @@ except ImportError:
         CLOUD_SYNC_AVAILABLE = False
         MT5CloudSync = None
         logger.warning("Cloud sync module not available")
-
-# --- Logging setup ---
-logging.basicConfig(level=logging.INFO)
-logger = logging.getLogger(__name__)
 
 # --- MySQL configuration (same DB as your PHP app) ---
 # XAMPP default को लागि यी value ठीक हुन्छन्, आफ्नो DB अनुसार change गर्न सक्नुहुन्छ

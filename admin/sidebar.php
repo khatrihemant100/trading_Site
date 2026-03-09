@@ -56,6 +56,12 @@
             </a>
         </li>
         <li class="admin-nav-item">
+            <a href="settings.php" class="admin-nav-link <?php echo basename($_SERVER['PHP_SELF']) === 'settings.php' ? 'active' : ''; ?>">
+                <i class="fas fa-cog"></i>
+                <span>Settings</span>
+            </a>
+        </li>
+        <li class="admin-nav-item">
             <a href="../dashboard/dashboard.php" class="admin-nav-link">
                 <i class="fas fa-arrow-left"></i>
                 <span>Back to Site</span>

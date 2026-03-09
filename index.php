@@ -1,5 +1,6 @@
 <?php
 session_start();
+require_once __DIR__.'/includes/check_course_status.php';
 ?>
 <!DOCTYPE html>
 <html lang="en">
@@ -143,7 +144,7 @@ session_start();
         }
         
         .hero-section {
-            background: url('img/hero.head.jpg') center/cover no-repeat;
+            background: url('img/hero.head.png') center/cover no-repeat;
             color: white;
             padding: 150px 0;
             position: relative;
@@ -151,9 +152,9 @@ session_start();
             min-height: 600px;
             display: flex;
             align-items: center;
-            filter: brightness(1);
         }
         
+        /* Dark blur overlay for better text readability - lighter */
         .hero-section::before {
             content: '';
             position: absolute;
@@ -161,11 +162,13 @@ session_start();
             left: 0;
             right: 0;
             bottom: 0;
-            background: linear-gradient(135deg, rgba(15, 23, 42, 0.4) 0%, rgba(15, 23, 42, 0.3) 100%);
-            backdrop-filter: blur(0.5px);
-            filter: none;
+            background: linear-gradient(135deg, rgba(15, 23, 42, 0.45) 0%, rgba(15, 23, 42, 0.35) 50%, rgba(15, 23, 42, 0.45) 100%);
+            backdrop-filter: blur(4px);
+            -webkit-backdrop-filter: blur(4px);
+            z-index: 1;
         }
         
+        /* Additional dark overlay - lighter */
         .hero-section::after {
             content: '';
             position: absolute;
@@ -173,35 +176,264 @@ session_start();
             left: 0;
             right: 0;
             bottom: 0;
-            background: rgba(0, 0, 0, 0.3);
-            filter: none;
+            background: rgba(0, 0, 0, 0.25);
+            z-index: 1;
+        }
+        
+        /* Glowing gradient lighting effects */
+        .hero-glow {
+            position: absolute;
+            width: 600px;
+            height: 600px;
+            border-radius: 50%;
+            background: radial-gradient(circle, rgba(16, 185, 129, 0.3) 0%, transparent 70%);
+            filter: blur(80px);
+            z-index: 2;
+            animation: glowMove 8s ease-in-out infinite;
+        }
+        
+        .hero-glow-1 {
+            top: -200px;
+            right: -200px;
+            animation-delay: 0s;
+        }
+        
+        .hero-glow-2 {
+            bottom: -200px;
+            left: -200px;
+            background: radial-gradient(circle, rgba(59, 130, 246, 0.25) 0%, transparent 70%);
+            animation-delay: 2s;
+        }
+        
+        @keyframes glowMove {
+            0%, 100% { transform: translate(0, 0) scale(1); opacity: 0.6; }
+            50% { transform: translate(50px, 50px) scale(1.2); opacity: 0.8; }
+        }
+        
+        /* Moving stock chart lines */
+        .chart-line {
+            position: absolute;
+            width: 100%;
+            height: 2px;
+            background: linear-gradient(90deg, transparent, rgba(16, 185, 129, 0.4), transparent);
+            z-index: 2;
+            opacity: 0.3;
+        }
+        
+        .chart-line-1 {
+            top: 20%;
+            animation: chartMove1 12s linear infinite;
+        }
+        
+        .chart-line-2 {
+            top: 50%;
+            animation: chartMove2 15s linear infinite;
+            background: linear-gradient(90deg, transparent, rgba(59, 130, 246, 0.3), transparent);
+        }
+        
+        .chart-line-3 {
+            top: 80%;
+            animation: chartMove3 18s linear infinite;
+            background: linear-gradient(90deg, transparent, rgba(245, 158, 11, 0.3), transparent);
+        }
+        
+        @keyframes chartMove1 {
+            0% { transform: translateX(-100%); }
+            100% { transform: translateX(100%); }
+        }
+        
+        @keyframes chartMove2 {
+            0% { transform: translateX(100%); }
+            100% { transform: translateX(-100%); }
+        }
+        
+        @keyframes chartMove3 {
+            0% { transform: translateX(-100%); }
+            100% { transform: translateX(100%); }
+        }
+        
+        /* Floating financial numbers */
+        .floating-number {
+            position: absolute;
+            color: rgba(16, 185, 129, 0.6);
+            font-size: 1.2rem;
+            font-weight: 700;
+            font-family: 'Courier New', monospace;
+            z-index: 2;
+            text-shadow: 0 0 10px rgba(16, 185, 129, 0.5);
+            pointer-events: none;
+        }
+        
+        .floating-number.positive {
+            color: rgba(16, 185, 129, 0.6);
+        }
+        
+        .floating-number.negative {
+            color: rgba(239, 68, 68, 0.6);
+            text-shadow: 0 0 10px rgba(239, 68, 68, 0.5);
+        }
+        
+        /* Futuristic data effects - grid pattern */
+        .data-grid {
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background-image: 
+                linear-gradient(rgba(16, 185, 129, 0.03) 1px, transparent 1px),
+                linear-gradient(90deg, rgba(16, 185, 129, 0.03) 1px, transparent 1px);
+            background-size: 50px 50px;
+            z-index: 2;
+            opacity: 0.4;
+            animation: gridPulse 4s ease-in-out infinite;
+        }
+        
+        @keyframes gridPulse {
+            0%, 100% { opacity: 0.3; }
+            50% { opacity: 0.5; }
+        }
+        
+        /* Data points animation */
+        .data-point {
+            position: absolute;
+            width: 4px;
+            height: 4px;
+            background: rgba(16, 185, 129, 0.6);
+            border-radius: 50%;
+            z-index: 2;
+            box-shadow: 0 0 10px rgba(16, 185, 129, 0.8);
+            animation: dataPointPulse 3s ease-in-out infinite;
+        }
+        
+        @keyframes dataPointPulse {
+            0%, 100% { transform: scale(1); opacity: 0.6; }
+            50% { transform: scale(1.5); opacity: 1; }
         }
         
         .hero-content {
             position: relative;
-            z-index: 3;
-            text-shadow: 2px 2px 8px rgba(0, 0, 0, 0.8);
-            filter: brightness(1.1);
+            z-index: 10;
+            text-shadow: 2px 2px 12px rgba(0, 0, 0, 0.9), 0 0 30px rgba(0, 0, 0, 0.6);
         }
         
         .hero-title {
             font-size: 3.5rem;
-            font-weight: 700;
+            font-weight: 800;
             margin-bottom: 1.5rem;
             line-height: 1.2;
-            color: #ffffff;
-            text-shadow: 3px 3px 10px rgba(0, 0, 0, 0.9), 0 0 20px rgba(0, 0, 0, 0.5);
+            background: linear-gradient(135deg, #fbbf24 0%, #f59e0b 30%, #10b981 60%, #3b82f6 100%);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+            text-shadow: none;
+            letter-spacing: -0.5px;
+            min-height: 4.2rem;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 0.3rem;
+            filter: drop-shadow(0 0 30px rgba(251, 191, 36, 0.4));
+            animation: titleGradient 5s ease infinite;
+            background-size: 200% 200%;
+        }
+        
+        @keyframes titleGradient {
+            0% { background-position: 0% 50%; }
+            50% { background-position: 100% 50%; }
+            100% { background-position: 0% 50%; }
+        }
+        
+        .typing-cursor {
+            display: inline-block;
+            width: 3px;
+            height: 3.5rem;
+            background: linear-gradient(180deg, #fbbf24 0%, #10b981 100%);
+            animation: blink 1s infinite, cursorGlow 2s ease-in-out infinite;
+            margin-left: 5px;
+            box-shadow: 0 0 15px rgba(251, 191, 36, 0.8), 0 0 25px rgba(16, 185, 129, 0.6);
+        }
+        
+        @keyframes cursorGlow {
+            0%, 100% { 
+                box-shadow: 0 0 15px rgba(251, 191, 36, 0.8), 0 0 25px rgba(16, 185, 129, 0.6);
+            }
+            50% { 
+                box-shadow: 0 0 25px rgba(251, 191, 36, 1), 0 0 40px rgba(16, 185, 129, 0.9);
+            }
+        }
+        
+        @keyframes blink {
+            0%, 50% { opacity: 1; }
+            51%, 100% { opacity: 0; }
+        }
+        
+        #typing-text {
+            display: inline-block;
         }
         
         .hero-subtitle {
-            font-size: 1.25rem;
-            color: rgba(255, 255, 255, 0.95);
+            font-size: 1.3rem;
+            color: rgba(255, 255, 255, 0.98);
             margin-bottom: 2.5rem;
-            max-width: 700px;
+            max-width: 850px;
             margin-left: auto;
             margin-right: auto;
-            text-shadow: 2px 2px 8px rgba(0, 0, 0, 0.8);
+            text-shadow: 2px 2px 12px rgba(0, 0, 0, 0.95), 0 0 20px rgba(0, 0, 0, 0.5);
             font-weight: 400;
+            animation: subtitleFadeIn 1.2s ease-out;
+            line-height: 1.8;
+        }
+        
+        .subtitle-highlight {
+            background: linear-gradient(135deg, #fbbf24 0%, #f59e0b 50%, #10b981 100%);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+            font-weight: 700;
+            position: relative;
+            display: inline-block;
+            animation: highlightPulse 2s ease-in-out infinite;
+            filter: drop-shadow(0 0 8px rgba(251, 191, 36, 0.6));
+        }
+        
+        .subtitle-highlight::after {
+            content: '';
+            position: absolute;
+            bottom: 2px;
+            left: 0;
+            width: 100%;
+            height: 3px;
+            background: linear-gradient(90deg, #fbbf24 0%, #f59e0b 50%, #10b981 100%);
+            opacity: 0.8;
+            animation: underlineGlow 2s ease-in-out infinite;
+            border-radius: 2px;
+            box-shadow: 0 0 10px rgba(251, 191, 36, 0.6);
+        }
+        
+        @keyframes subtitleFadeIn {
+            from { opacity: 0; transform: translateY(20px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+        
+        @keyframes highlightPulse {
+            0%, 100% { 
+                filter: drop-shadow(0 0 8px rgba(251, 191, 36, 0.6));
+            }
+            50% { 
+                filter: drop-shadow(0 0 15px rgba(251, 191, 36, 0.9)) drop-shadow(0 0 25px rgba(16, 185, 129, 0.6));
+            }
+        }
+        
+        @keyframes underlineGlow {
+            0%, 100% { 
+                opacity: 0.6;
+                box-shadow: 0 0 10px rgba(251, 191, 36, 0.6);
+            }
+            50% { 
+                opacity: 1;
+                box-shadow: 0 0 20px rgba(251, 191, 36, 0.9), 0 0 30px rgba(16, 185, 129, 0.6);
+            }
         }
         
         @media (max-width: 768px) {
@@ -224,25 +456,31 @@ session_start();
         }
         
         .hero-cta {
-            background-color: var(--primary);
-            color: white;
+            background-color: #10b981;
+            color: #fbbf24;
             padding: 15px 40px;
             font-size: 1.1rem;
-            font-weight: 600;
+            font-weight: 700;
             border-radius: 8px;
             border: none;
-            transition: all 0.3s;
+            transition: all 0.3s ease;
             text-decoration: none;
             display: inline-block;
-            box-shadow: 0 4px 15px rgba(0, 0, 0, 0.4), 0 0 20px rgba(16, 185, 129, 0.3);
-            text-shadow: none;
+            box-shadow: 0 4px 15px rgba(0, 0, 0, 0.3);
+            margin-top: 1.5rem;
+            letter-spacing: 0.5px;
         }
         
         .hero-cta:hover {
-            background-color: var(--primary-dark);
-            transform: translateY(-2px);
-            box-shadow: 0 6px 20px rgba(0, 0, 0, 0.5), 0 0 30px rgba(16, 185, 129, 0.4);
-            color: white;
+            background-color: #059669;
+            color: #f59e0b;
+            transform: translateY(-3px) scale(1.05);
+            box-shadow: 0 6px 20px rgba(0, 0, 0, 0.4), 0 0 30px rgba(16, 185, 129, 0.5);
+        }
+        
+        .hero-cta:active {
+            transform: translateY(-1px) scale(1.02);
+            box-shadow: 0 3px 10px rgba(0, 0, 0, 0.3);
         }
         
         .features-section {
@@ -513,7 +751,7 @@ session_start();
                         <a class="nav-link" href="blog.php">BLOG</a>
                     </li>
                     <li class="nav-item">
-                        <a class="nav-link" href="course/course.php">COURSE</a>
+                        <a class="nav-link" href="course/course.php" onclick="return handleCourseClick(event)">COURSE</a>
                     </li>
                     <li class="nav-item">
                         <a class="nav-link" href="about.php">ABOUT US</a>
@@ -565,10 +803,34 @@ session_start();
 
     <!-- Hero Section -->
     <section class="hero-section">
+        <!-- Glowing gradient lighting effects -->
+        <div class="hero-glow hero-glow-1"></div>
+        <div class="hero-glow hero-glow-2"></div>
+        
+        <!-- Futuristic data grid -->
+        <div class="data-grid"></div>
+        
+        <!-- Moving stock chart lines -->
+        <div class="chart-line chart-line-1"></div>
+        <div class="chart-line chart-line-2"></div>
+        <div class="chart-line chart-line-3"></div>
+        
+        <!-- Floating financial numbers (will be generated by JS) -->
+        <div id="floatingNumbers"></div>
+        
+        <!-- Data points (will be generated by JS) -->
+        <div id="dataPoints"></div>
+        
         <div class="container">
             <div class="hero-content text-center">
-                <h1 class="hero-title">Master Your Trading Journey</h1>
-                <p class="hero-subtitle">Professional trading journal, portfolio management, and community platform for traders</p>
+                <h1 class="hero-title">
+                    <span id="typing-text"></span><span class="typing-cursor">|</span>
+                </h1>
+                <p class="hero-subtitle">
+                    <span class="subtitle-highlight">Transform</span> your trading with AI-powered insights, 
+                    <span class="subtitle-highlight">analyze</span> every trade like a pro, and 
+                    <span class="subtitle-highlight">connect</span> with Nepal's elite trading community
+                </p>
                 <a href="register.php" class="hero-cta">Start Trading Smarter</a>
             </div>
         </div>
@@ -823,7 +1085,151 @@ session_start();
     <!-- Scripts -->
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
     
-    <!-- AI Chat Widget -->
-    <?php include 'includes/ai-chat-widget.php'; ?>
+    <script>
+        // Typewriter animation for hero title
+        const typingTexts = [
+            'Trade Smarter.',
+            'Track Better.',
+            'Grow Faster.'
+        ];
+        
+        let currentTextIndex = 0;
+        let currentCharIndex = 0;
+        let isDeleting = false;
+        let typingSpeed = 100;
+        
+        function typeWriter() {
+            const element = document.getElementById('typing-text');
+            if (!element) return;
+            
+            const currentText = typingTexts[currentTextIndex];
+            
+            if (isDeleting) {
+                // Delete text
+                element.textContent = currentText.substring(0, currentCharIndex - 1);
+                currentCharIndex--;
+                typingSpeed = 50; // Faster when deleting
+                
+                if (currentCharIndex === 0) {
+                    isDeleting = false;
+                    currentTextIndex = (currentTextIndex + 1) % typingTexts.length;
+                    typingSpeed = 500; // Pause before typing next
+                }
+            } else {
+                // Type text
+                element.textContent = currentText.substring(0, currentCharIndex + 1);
+                currentCharIndex++;
+                typingSpeed = 100; // Normal typing speed
+                
+                if (currentCharIndex === currentText.length) {
+                    isDeleting = true;
+                    typingSpeed = 2000; // Pause before deleting
+                }
+            }
+            
+            setTimeout(typeWriter, typingSpeed);
+        }
+        
+        // Start typewriter effect when page loads
+        document.addEventListener('DOMContentLoaded', function() {
+            // Small delay before starting
+            setTimeout(() => {
+                typeWriter();
+            }, 500);
+        });
+        
+        // Generate floating financial numbers
+        function createFloatingNumbers() {
+            const container = document.getElementById('floatingNumbers');
+            const numbers = ['+2.45%', '+$1,234', '+5.67%', '-1.23%', '+$890', '+3.21%', '+$567', '-0.45%', '+$1,890', '+4.56%'];
+            const isPositive = [true, true, true, false, true, true, true, false, true, true];
+            
+            for (let i = 0; i < 15; i++) {
+                const number = document.createElement('div');
+                number.className = `floating-number ${isPositive[i % isPositive.length] ? 'positive' : 'negative'}`;
+                number.textContent = numbers[i % numbers.length];
+                
+                // Random position
+                const left = Math.random() * 100;
+                const top = Math.random() * 100;
+                const delay = Math.random() * 5;
+                const duration = 8 + Math.random() * 4;
+                
+                number.style.left = left + '%';
+                number.style.top = top + '%';
+                number.style.animation = `floatNumber ${duration}s ease-in-out infinite`;
+                number.style.animationDelay = delay + 's';
+                
+                container.appendChild(number);
+            }
+        }
+        
+        // Generate data points
+        function createDataPoints() {
+            const container = document.getElementById('dataPoints');
+            
+            for (let i = 0; i < 20; i++) {
+                const point = document.createElement('div');
+                point.className = 'data-point';
+                
+                const left = Math.random() * 100;
+                const top = Math.random() * 100;
+                const delay = Math.random() * 3;
+                
+                point.style.left = left + '%';
+                point.style.top = top + '%';
+                point.style.animationDelay = delay + 's';
+                
+                container.appendChild(point);
+            }
+        }
+        
+        // Floating number animation
+        const style = document.createElement('style');
+        style.textContent = `
+            @keyframes floatNumber {
+                0% {
+                    transform: translateY(0) translateX(0) scale(1);
+                    opacity: 0;
+                }
+                10% {
+                    opacity: 0.8;
+                }
+                90% {
+                    opacity: 0.8;
+                }
+                100% {
+                    transform: translateY(-100vh) translateX(${Math.random() * 200 - 100}px) scale(0.5);
+                    opacity: 0;
+                }
+            }
+        `;
+        document.head.appendChild(style);
+        
+        // Initialize on page load
+        document.addEventListener('DOMContentLoaded', function() {
+            createFloatingNumbers();
+            createDataPoints();
+            
+            // Regenerate numbers every 15 seconds for continuous effect
+            setInterval(() => {
+                const container = document.getElementById('floatingNumbers');
+                container.innerHTML = '';
+                createFloatingNumbers();
+            }, 15000);
+        });
+    </script>
+    
+    <?php include __DIR__.'/includes/coming_soon_notification.php'; ?>
+    
+    <script>
+        <?php if (!isCoursesEnabled()): ?>
+        function handleCourseClick(event) {
+            event.preventDefault();
+            showComingSoon();
+            return false;
+        }
+        <?php endif; ?>
+    </script>
 </body>
 </html>

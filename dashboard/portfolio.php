@@ -17,7 +17,7 @@ $mode_name = get_mode_name();
 $currency_rates = [
     'USD' => 1.0,
     'EUR' => 1.08,  // 1 EUR = 1.08 USD (approximate)
-    'NPR' => 0.0075, // 1 NPR = 0.0075 USD (approximate, 1 USD ≈ 133 NPR)
+    'NPR' => 0.0075, // 1 NPR = 0.0075 USD (approximate, 1 USD ≁E133 NPR)
     'GBP' => 1.27,
     'JPY' => 0.0067,
     'AUD' => 0.66,
@@ -217,12 +217,12 @@ try {
     }
     $active_accounts = $active_accounts_stmt->fetch(PDO::FETCH_ASSOC)['total'];
     
-    // Failed/Closed accounts (breach, closed, inactive) - filtered by mode
+    // Failed/Closed accounts (breach, closed, inactive, loss) - filtered by mode
     if ($columns_check_demo) {
-        $failed_accounts_stmt = $pdo->prepare("SELECT COUNT(*) as total FROM trading_accounts WHERE user_id = ? AND is_demo = ? AND status IN ('closed', 'inactive', 'breach')");
+        $failed_accounts_stmt = $pdo->prepare("SELECT COUNT(*) as total FROM trading_accounts WHERE user_id = ? AND is_demo = ? AND status IN ('closed', 'inactive', 'breach', 'loss')");
         $failed_accounts_stmt->execute([$_SESSION['user_id'], $is_demo]);
     } else {
-    $failed_accounts_stmt = $pdo->prepare("SELECT COUNT(*) as total FROM trading_accounts WHERE user_id = ? AND status IN ('closed', 'inactive', 'breach')");
+    $failed_accounts_stmt = $pdo->prepare("SELECT COUNT(*) as total FROM trading_accounts WHERE user_id = ? AND status IN ('closed', 'inactive', 'breach', 'loss')");
     $failed_accounts_stmt->execute([$_SESSION['user_id']]);
     }
     $failed_accounts = $failed_accounts_stmt->fetch(PDO::FETCH_ASSOC)['total'];
@@ -361,6 +361,55 @@ try {
         $lifetime_pl_usd += $profit_loss_usd;
     }
     
+    // Add loss from accounts with status='loss' to lifetime loss
+    // Get accounts with status='loss' and calculate their loss
+    if ($columns_check_demo) {
+        $loss_accounts_for_total_stmt = $pdo->prepare("
+            SELECT 
+                account_type,
+                initial_balance,
+                current_balance,
+                COALESCE(challenge_fee, 0) as challenge_fee,
+                currency
+            FROM trading_accounts
+            WHERE user_id = ? AND is_demo = ? AND status = 'loss'
+        ");
+        $loss_accounts_for_total_stmt->execute([$_SESSION['user_id'], $is_demo]);
+    } else {
+        $loss_accounts_for_total_stmt = $pdo->prepare("
+            SELECT 
+                account_type,
+                initial_balance,
+                current_balance,
+                COALESCE(challenge_fee, 0) as challenge_fee,
+                currency
+            FROM trading_accounts
+            WHERE user_id = ? AND status = 'loss'
+        ");
+        $loss_accounts_for_total_stmt->execute([$_SESSION['user_id']]);
+    }
+    $loss_accounts_for_total = $loss_accounts_for_total_stmt->fetchAll(PDO::FETCH_ASSOC);
+    
+    // Add loss from accounts with status='loss' to lifetime loss
+    foreach ($loss_accounts_for_total as $loss_acc) {
+        $currency = $loss_acc['currency'] ?? 'USD';
+        
+        // Calculate loss amount
+        if ($loss_acc['account_type'] === 'propfirm') {
+            // For prop firms: challenge_fee is the loss (investment lost)
+            $account_loss = floatval($loss_acc['challenge_fee'] ?? 0);
+        } else {
+            // For regular accounts (forex, etc.) with status='loss': entire initial_balance is loss
+            $account_loss = floatval($loss_acc['initial_balance'] ?? 0);
+        }
+        
+        if ($account_loss > 0) {
+            $loss_usd = convertToUSD($account_loss, $currency, $currency_rates);
+            $lifetime_loss_usd += $loss_usd;
+            $lifetime_pl_usd -= $loss_usd; // Subtract from net P/L
+        }
+    }
+    
     $lifetime_pl = $lifetime_pl_usd;
     $total_profit = $lifetime_profit_usd;
     $total_loss = $lifetime_loss_usd;
@@ -391,7 +440,7 @@ try {
     }
     $broker_loss_data = $broker_loss_stmt->fetchAll(PDO::FETCH_ASSOC);
     
-    // Group by broker and convert to USD
+    // Group by broker and convert to USD (keep as numeric totals for now)
     $broker_losses = [];
     foreach ($broker_loss_data as $row) {
         $broker = $row['broker_name'] ?? 'Unknown';
@@ -405,7 +454,65 @@ try {
         $broker_losses[$broker] += $loss_usd;
     }
     
-    // Convert to array format and sort
+    // Add loss from accounts with status='loss' to broker losses
+    // Get accounts with status='loss' and calculate their loss
+    if ($columns_check_demo) {
+        $loss_accounts_stmt = $pdo->prepare("
+            SELECT 
+                id,
+                broker_name,
+                account_type,
+                initial_balance,
+                current_balance,
+                COALESCE(challenge_fee, 0) as challenge_fee,
+                currency
+            FROM trading_accounts
+            WHERE user_id = ? AND is_demo = ? AND status = 'loss'
+        ");
+        $loss_accounts_stmt->execute([$_SESSION['user_id'], $is_demo]);
+    } else {
+        $loss_accounts_stmt = $pdo->prepare("
+            SELECT 
+                id,
+                broker_name,
+                account_type,
+                initial_balance,
+                current_balance,
+                COALESCE(challenge_fee, 0) as challenge_fee,
+                currency
+            FROM trading_accounts
+            WHERE user_id = ? AND status = 'loss'
+        ");
+        $loss_accounts_stmt->execute([$_SESSION['user_id']]);
+    }
+    $loss_accounts = $loss_accounts_stmt->fetchAll(PDO::FETCH_ASSOC);
+    
+    // Calculate loss for each account with status='loss'
+    foreach ($loss_accounts as $loss_acc) {
+        $currency = $loss_acc['currency'] ?? 'USD';
+        $broker = $loss_acc['broker_name'] ?? 'Unknown';
+        
+        // Calculate loss amount
+        if ($loss_acc['account_type'] === 'propfirm') {
+            // For prop firms: challenge_fee is the loss (investment lost)
+            $account_loss = floatval($loss_acc['challenge_fee'] ?? 0);
+        } else {
+            // For regular accounts (forex, etc.) with status='loss': entire initial_balance is loss
+            $account_loss = floatval($loss_acc['initial_balance'] ?? 0);
+        }
+        
+        if ($account_loss > 0) {
+            $loss_usd = convertToUSD($account_loss, $currency, $currency_rates);
+            
+            // Add to broker losses
+            if (!isset($broker_losses[$broker])) {
+                $broker_losses[$broker] = 0;
+            }
+            $broker_losses[$broker] += $loss_usd;
+        }
+    }
+    
+    // Re-sort broker losses after adding account losses
     $broker_losses = array_map(function($broker, $loss) {
         return ['broker_name' => $broker, 'total_loss' => -$loss];
     }, array_keys($broker_losses), $broker_losses);
@@ -457,6 +564,34 @@ try {
         $type_losses[$type]['total_loss'] += $loss_usd;
         if ($account_id && !in_array($account_id, $type_losses[$type]['account_ids'])) {
             $type_losses[$type]['account_ids'][] = $account_id;
+        }
+    }
+    
+    // Add loss from accounts with status='loss' to account type losses
+    foreach ($loss_accounts as $loss_acc) {
+        $currency = $loss_acc['currency'] ?? 'USD';
+        $type = $loss_acc['account_type'] ?? 'Unknown';
+        $account_id = $loss_acc['id'];
+        
+        // Calculate loss amount
+        if ($loss_acc['account_type'] === 'propfirm') {
+            // For prop firms: challenge_fee is the loss (investment lost)
+            $account_loss = floatval($loss_acc['challenge_fee'] ?? 0);
+        } else {
+            // For regular accounts (forex, etc.) with status='loss': entire initial_balance is loss
+            $account_loss = floatval($loss_acc['initial_balance'] ?? 0);
+        }
+        
+        if ($account_loss > 0) {
+            $loss_usd = convertToUSD($account_loss, $currency, $currency_rates);
+            
+            if (!isset($type_losses[$type])) {
+                $type_losses[$type] = ['total_loss' => 0, 'account_ids' => []];
+            }
+            $type_losses[$type]['total_loss'] += $loss_usd;
+            if ($account_id && !in_array($account_id, $type_losses[$type]['account_ids'])) {
+                $type_losses[$type]['account_ids'][] = $account_id;
+            }
         }
     }
     
@@ -1356,7 +1491,317 @@ $random_quote = $quotes[array_rand($quotes)];
     }
     $is_demo = is_demo_mode();
     ?>
+    
+        /* Share Modal Styles */
+        .share-card-preview {
+            box-shadow: 0 20px 60px rgba(251, 191, 36, 0.4), 0 0 0 1px rgba(255,255,255,0.1);
+            transition: all 0.3s ease;
+            position: relative;
+        }
+        
+        .format-btn {
+            flex: 1;
+            padding: 15px 10px;
+            border-radius: 10px;
+            transition: all 0.3s ease;
+            text-align: center;
+            border: 2px solid var(--border-color);
+            background: var(--dark-card);
+            color: var(--text-primary);
+            font-weight: 500;
+        }
+        
+        .format-btn:hover {
+            border-color: #fbbf24;
+            background: rgba(251, 191, 36, 0.1);
+            transform: translateY(-2px);
+        }
+        
+        .format-btn.active {
+            font-weight: 700;
+            background: linear-gradient(135deg, #fbbf24 0%, #f59e0b 100%);
+            border-color: #fbbf24;
+            color: white;
+            box-shadow: 0 4px 15px rgba(251, 191, 36, 0.4);
+        }
+        
+        .share-withdrawal-btn {
+            transition: all 0.3s ease;
+            border-radius: 8px;
+            padding: 6px 12px;
+            cursor: pointer !important;
+            pointer-events: auto !important;
+            position: relative;
+            z-index: 10;
+        }
+        
+        .share-withdrawal-btn:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 4px 12px rgba(251, 191, 36, 0.3);
+        }
+        
+        .share-withdrawal-btn:active {
+            transform: translateY(0);
+        }
+        
+        #shareCardPreview {
+            transition: all 0.5s cubic-bezier(0.4, 0, 0.2, 1);
+            animation: cardGlow 4s ease-in-out infinite;
+        }
+        
+        @keyframes float {
+            0%, 100% { transform: translateY(-50%) rotate(45deg) translateY(0); }
+            50% { transform: translateY(-50%) rotate(45deg) translateY(-10px); }
+        }
+        
+        @keyframes shimmer {
+            0% { left: -100%; }
+            100% { left: 100%; }
+        }
+        
+        @keyframes shine {
+            0% { transform: translateX(-100%) translateY(-100%) rotate(45deg); }
+            100% { transform: translateX(100%) translateY(100%) rotate(45deg); }
+        }
+        
+        @keyframes cardGlow {
+            0%, 100% { box-shadow: 0 25px 80px rgba(251, 191, 36, 0.5), inset 0 0 100px rgba(251, 191, 36, 0.15), 0 0 60px rgba(251, 191, 36, 0.3); }
+            50% { box-shadow: 0 25px 100px rgba(251, 191, 36, 0.7), inset 0 0 120px rgba(251, 191, 36, 0.2), 0 0 80px rgba(251, 191, 36, 0.4); }
+        }
+        
+        .modal-content {
+            border-radius: 16px;
+            border: 1px solid var(--border-color);
+            overflow: hidden;
+        }
+        
+        .modal-header {
+            background: var(--dark-card);
+            border-bottom: 1px solid var(--border-color);
+            padding: 20px 30px;
+        }
+        
+        .modal-title {
+            color: var(--text-primary);
+            font-weight: 700;
+            font-size: 1.25rem;
+        }
+        
+        .modal-body {
+            background: var(--dark-bg);
+            padding: 30px;
+        }
+        
+        .btn-close-white {
+            filter: invert(1);
+        }
     </style>
+    <script>
+        // Share Withdrawal Functionality - Define early so it's available when buttons are rendered
+        let currentWithdrawalData = {};
+        let currentFormat = 'post';
+        
+        // Function to open share modal - globally accessible
+        function openShareModal(btn, event) {
+            console.log('=== openShareModal CALLED ===', btn);
+            
+            // Prevent any default behavior
+            if (event) {
+                event.preventDefault();
+                event.stopPropagation();
+            }
+            
+            if (!btn) {
+                console.error('Button element not provided');
+                alert('Button not found');
+                return false;
+            }
+            
+            try {
+                // Get all data attributes
+                const withdrawalId = btn.getAttribute('data-withdrawal-id');
+                const amount = btn.getAttribute('data-amount');
+                const currency = btn.getAttribute('data-currency');
+                const amountOriginal = btn.getAttribute('data-amount-original');
+                const account = btn.getAttribute('data-account');
+                const platform = btn.getAttribute('data-platform');
+                const date = btn.getAttribute('data-date');
+                
+                console.log('Data attributes:', {
+                    withdrawalId, amount, currency, amountOriginal, account, platform, date
+                });
+                
+                currentWithdrawalData = {
+                    id: withdrawalId,
+                    amount: parseFloat(amount) || 0,
+                    currency: currency || 'USD',
+                    amountOriginal: parseFloat(amountOriginal) || 0,
+                    account: account || 'N/A',
+                    platform: platform || 'N/A',
+                    date: date || ''
+                };
+                
+                console.log('Share button clicked - Data:', currentWithdrawalData);
+                
+                // Get modal element first
+                const modalElement = document.getElementById('shareWithdrawalModal');
+                console.log('Modal element:', modalElement);
+                
+                if (!modalElement) {
+                    console.error('Modal element not found');
+                    alert('Share modal not found. Please refresh the page.');
+                    return false;
+                }
+                
+                // Check if Bootstrap is loaded
+                if (typeof bootstrap === 'undefined') {
+                    console.error('Bootstrap is not loaded');
+                    alert('Bootstrap library not loaded. Please refresh the page.');
+                    return false;
+                }
+                
+                console.log('Bootstrap found, creating modal...');
+                
+                // Create and show modal first
+                const modal = new bootstrap.Modal(modalElement, {
+                    backdrop: true,
+                    keyboard: true,
+                    focus: true
+                });
+                
+                console.log('Modal instance created, showing...');
+                modal.show();
+                
+                // Update share card content after modal is shown (wait for modal to be visible)
+                setTimeout(function() {
+                    if (typeof updateShareCard === 'function') {
+                        console.log('Calling updateShareCard with data:', currentWithdrawalData);
+                        updateShareCard();
+                    } else {
+                        console.warn('updateShareCard function not found');
+                        // Manual update
+                        const amountEl = document.getElementById('shareCardAmount');
+                        const accountEl = document.getElementById('shareCardAccount');
+                        const platformEl = document.getElementById('shareCardPlatform');
+                        const dateEl = document.getElementById('shareCardDate');
+                        const currencyEl = document.getElementById('shareCardCurrency');
+                        
+                        if (amountEl) {
+                            const formattedAmount = (currentWithdrawalData.amount || 0).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+                            amountEl.textContent = `+$${formattedAmount}`;
+                            amountEl.style.color = '#10b981';
+                        }
+                        if (accountEl) accountEl.textContent = currentWithdrawalData.account || 'N/A';
+                        if (platformEl) platformEl.textContent = currentWithdrawalData.platform || 'N/A';
+                        if (dateEl) dateEl.textContent = currentWithdrawalData.date || '-';
+                        if (currencyEl) currencyEl.textContent = currentWithdrawalData.currency || 'USD';
+                    }
+                }, 300);
+                
+                console.log('Modal opened successfully');
+                return false; // Prevent default form submission
+            } catch (error) {
+                console.error('Error opening share modal:', error);
+                console.error('Error stack:', error.stack);
+                alert('Error opening share modal: ' + error.message);
+                return false;
+            }
+        }
+        
+        // Update share card content - Define early so it's available
+        function updateShareCard() {
+            console.log('=== updateShareCard CALLED ===');
+            console.log('Current withdrawal data:', currentWithdrawalData);
+            
+            const amount = currentWithdrawalData.amount || 0;
+            const currency = currentWithdrawalData.currency || 'USD';
+            const account = currentWithdrawalData.account || 'N/A';
+            const platform = currentWithdrawalData.platform || 'N/A';
+            const date = currentWithdrawalData.date || '-';
+            
+            // Format amount with proper spacing
+            const formattedAmount = amount.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+            
+            // Update amount with green color
+            const amountEl = document.getElementById('shareCardAmount');
+            if (amountEl) {
+                amountEl.textContent = `+$${formattedAmount}`;
+                amountEl.style.color = '#10b981';
+                console.log('✓ Amount updated:', `+$${formattedAmount}`);
+            } else {
+                console.error('✗ shareCardAmount element not found');
+            }
+            
+            // Update currency
+            const currencyEl = document.getElementById('shareCardCurrency');
+            if (currencyEl) {
+                currencyEl.textContent = currency;
+                console.log('✓ Currency updated:', currency);
+            } else {
+                console.error('✗ shareCardCurrency element not found');
+            }
+            
+            // Update account
+            const accountEl = document.getElementById('shareCardAccount');
+            if (accountEl) {
+                accountEl.textContent = account;
+                console.log('✓ Account updated:', account);
+            } else {
+                console.error('✗ shareCardAccount element not found');
+            }
+            
+            // Update platform
+            const platformEl = document.getElementById('shareCardPlatform');
+            if (platformEl) {
+                platformEl.textContent = platform;
+                console.log('✓ Platform updated:', platform);
+            } else {
+                console.error('✗ shareCardPlatform element not found');
+            }
+            
+            // Update date
+            const dateEl = document.getElementById('shareCardDate');
+            if (dateEl) {
+                dateEl.textContent = date;
+                console.log('✓ Date updated:', date);
+            } else {
+                console.error('✗ shareCardDate element not found');
+            }
+            
+            console.log('=== Share card update complete ===');
+            
+            // Username is already set in PHP, but ensure it's visible
+            const usernameEl = document.getElementById('shareCardUsername');
+            if (usernameEl) {
+                usernameEl.style.display = 'block';
+                usernameEl.style.visibility = 'visible';
+                usernameEl.style.opacity = '1';
+            }
+            
+            const now = new Date();
+            const timestamp = now.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }) + ' at ' + 
+                            now.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', hour12: true });
+            const timestampEl = document.getElementById('shareCardTimestamp');
+            if (timestampEl) {
+                timestampEl.textContent = timestamp;
+            }
+            
+            // Update verification link with withdrawal ID
+            const verificationLink = document.getElementById('verificationLink');
+            if (verificationLink && currentWithdrawalData.id) {
+                verificationLink.href = `https://www.npltrader.com/verify?id=${currentWithdrawalData.id}`;
+            }
+            
+            // Update card dimensions based on format
+            if (typeof updateCardDimensions === 'function') {
+                updateCardDimensions();
+            }
+        }
+        
+        // Make functions globally accessible
+        window.openShareModal = openShareModal;
+        window.updateShareCard = updateShareCard;
+    </script>
 </head>
 <body class="<?php echo $is_demo ? 'demo-mode-active' : ''; ?>">
     <!-- Top Navigation Bar -->
@@ -1430,7 +1875,7 @@ $random_quote = $quotes[array_rand($quotes)];
                         <i class="fas fa-info-circle me-1"></i>All amounts converted to USD
                     </small>
                     <small class="text-muted" style="font-size: 0.7rem;">
-                        Exchange rates: NPR ≈ 0.0075, EUR ≈ 1.08
+                        Exchange rates: NPR ≁E0.0075, EUR ≁E1.08
                     </small>
                 </div>
             </div>
@@ -2170,19 +2615,36 @@ $random_quote = $quotes[array_rand($quotes)];
                                     <th>Amount</th>
                                     <th>Platform</th>
                                     <th>Details</th>
+                                    <th>Action</th>
                                 </tr>
                             </thead>
                             <tbody>
-                                <?php foreach ($recent_withdrawals as $w): ?>
+                                <?php foreach ($recent_withdrawals as $w): 
+                                    $withdrawal_usd = convertToUSD($w['withdrawal_amount'], $w['currency'], $currency_rates);
+                                ?>
                                     <tr>
                                         <td><?php echo date('M d, Y', strtotime($w['withdrawal_date'])); ?></td>
                                         <td><?php echo htmlspecialchars($w['account_name'] ?? 'N/A'); ?></td>
                                         <td class="text-success">
-                                            <strong><?php echo formatUSD(convertToUSD($w['withdrawal_amount'], $w['currency'], $currency_rates)); ?></strong>
+                                            <strong><?php echo formatUSD($withdrawal_usd); ?></strong>
                                             <small class="text-muted">(<?php echo $w['currency']; ?> <?php echo number_format($w['withdrawal_amount'], 2); ?>)</small>
                                         </td>
                                         <td><span class="badge bg-success text-capitalize"><?php echo htmlspecialchars($w['platform']); ?></span></td>
                                         <td><?php echo htmlspecialchars($w['platform_details'] ?? '-'); ?></td>
+                                        <td>
+                                            <button type="button" class="btn btn-sm btn-outline-warning share-withdrawal-btn" 
+                                                    onclick="event.preventDefault(); event.stopPropagation(); openShareModal(this, event); return false;"
+                                                    data-withdrawal-id="<?php echo $w['id']; ?>"
+                                                    data-amount="<?php echo $withdrawal_usd; ?>"
+                                                    data-currency="<?php echo htmlspecialchars($w['currency']); ?>"
+                                                    data-amount-original="<?php echo $w['withdrawal_amount']; ?>"
+                                                    data-account="<?php echo htmlspecialchars($w['account_name'] ?? 'N/A'); ?>"
+                                                    data-platform="<?php echo htmlspecialchars($w['platform']); ?>"
+                                                    data-date="<?php echo date('M d, Y', strtotime($w['withdrawal_date'])); ?>"
+                                                    title="Share Withdrawal">
+                                                <i class="fas fa-share-alt"></i> Share
+                                            </button>
+                                        </td>
                                     </tr>
                                 <?php endforeach; ?>
                             </tbody>
@@ -2222,16 +2684,27 @@ $random_quote = $quotes[array_rand($quotes)];
                                 <?php else: ?>
                                     <?php foreach ($recent_accounts as $account): 
                                         $challenge_fee = isset($account['challenge_fee']) ? floatval($account['challenge_fee']) : 0;
+                                        $account_status = strtolower(trim($account['status'] ?? ''));
                                         
                                         // Calculate actual investment and P/L
                                         if ($account['account_type'] === 'propfirm') {
                                             // For prop firms: challenge_fee is the actual investment
                                             $actual_investment = $challenge_fee > 0 ? $challenge_fee : 0;
-                                            $account_pl = $account['current_balance'] - $actual_investment;
+                                            if ($account_status === 'loss') {
+                                                // For prop firms with status='loss': entire challenge_fee is loss
+                                                $account_pl = -$actual_investment;
+                                            } else {
+                                                $account_pl = $account['current_balance'] - $actual_investment;
+                                            }
                                         } else {
                                             // For regular accounts: initial_balance is the investment
                                             $actual_investment = $account['initial_balance'];
-                                            $account_pl = $account['current_balance'] - $actual_investment;
+                                            if ($account_status === 'loss') {
+                                                // For regular accounts with status='loss': entire initial_balance is loss
+                                                $account_pl = -$actual_investment;
+                                            } else {
+                                                $account_pl = $account['current_balance'] - $actual_investment;
+                                            }
                                         }
                                         
                                         $account_roi = $actual_investment > 0 ? ($account_pl / $actual_investment) * 100 : 0;
@@ -2272,14 +2745,41 @@ $random_quote = $quotes[array_rand($quotes)];
                                             </td>
                                             <td>
                                                 <?php
+                                                $account_status = strtolower(trim($account['status'] ?? ''));
                                                 $status_class = 'secondary';
-                                                if ($account['status'] === 'active') $status_class = 'success';
-                                                elseif ($account['status'] === 'ongoing') $status_class = 'info';
-                                                elseif ($account['status'] === 'breach') $status_class = 'danger';
-                                                elseif ($account['status'] === 'closed') $status_class = 'warning';
+                                                $status_text = 'N/A';
+                                                
+                                                if ($account_status === 'active') {
+                                                    $status_class = 'success';
+                                                    $status_text = 'Active';
+                                                } elseif ($account_status === 'ongoing') {
+                                                    $status_class = 'info';
+                                                    $status_text = 'Ongoing';
+                                                } elseif ($account_status === 'breach') {
+                                                    $status_class = 'danger';
+                                                    $status_text = 'Breach';
+                                                } elseif ($account_status === 'loss') {
+                                                    $status_class = 'danger';
+                                                    $status_text = 'Loss';
+                                                } elseif ($account_status === 'closed') {
+                                                    $status_class = 'warning';
+                                                    $status_text = 'Closed';
+                                                } elseif ($account_status === 'inactive') {
+                                                    $status_class = 'secondary';
+                                                    $status_text = 'Inactive';
+                                                } elseif (!empty($account_status)) {
+                                                    $status_class = 'secondary';
+                                                    $status_text = ucfirst($account_status);
+                                                }
+                                                
+                                                // If status is empty but account shows as loss in P/L, show Loss
+                                                if (empty($account_status) && $account_pl < 0 && $account_pl <= -($actual_investment * 0.9)) {
+                                                    $status_class = 'danger';
+                                                    $status_text = 'Loss';
+                                                }
                                                 ?>
                                                 <span class="badge bg-<?php echo $status_class; ?>">
-                                                    <?php echo ucfirst($account['status']); ?>
+                                                    <?php echo $status_text; ?>
                                                 </span>
                                             </td>
                                             <td><?php echo date('M d, Y', strtotime($account['created_at'])); ?></td>
@@ -2297,15 +2797,184 @@ $random_quote = $quotes[array_rand($quotes)];
             <div class="motivation-quote" id="motivationQuote">
                 <?php echo htmlspecialchars($random_quote); ?>
             </div>
-            <div class="motivation-author">— Trading Wisdom</div>
+            <div class="motivation-author"> ETrading Wisdom</div>
             <button class="btn-refresh-quote" onclick="changeQuote()">
                 <i class="fas fa-sync-alt me-2"></i>New Quote
             </button>
         </div>
     </main>
     
+    <!-- Share Withdrawal Modal -->
+    <div class="modal fade" id="shareWithdrawalModal" tabindex="-1" aria-labelledby="shareWithdrawalModalLabel" aria-hidden="true">
+        <div class="modal-dialog modal-dialog-centered modal-lg">
+            <div class="modal-content" style="background: var(--dark-bg); border: 1px solid var(--border-color);">
+                <div class="modal-header" style="border-bottom: 1px solid var(--border-color);">
+                    <h5 class="modal-title" id="shareWithdrawalModalLabel">
+                        <i class="fas fa-share-alt me-2"></i>Share Trade
+                    </h5>
+                    <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
+                </div>
+                <div class="modal-body">
+                    <div class="row">
+                        <div class="col-md-8 mx-auto">
+                            <!-- Share Card Preview -->
+                            <div id="shareCardPreview" class="share-card-preview" style="background: linear-gradient(135deg, #fef3c7 0%, #fde68a 20%, #fcd34d 40%, #fbbf24 60%, #f59e0b 80%, #d97706 100%); border-radius: 24px; padding: 60px; position: relative; overflow: hidden; min-height: 500px; box-shadow: 0 25px 80px rgba(251, 191, 36, 0.6), inset 0 0 100px rgba(255, 255, 255, 0.2); border: 3px solid rgba(251, 191, 36, 0.5);">
+                                <!-- Animated Background Pattern -->
+                                <div style="position: absolute; top: 0; left: 0; right: 0; bottom: 0; opacity: 0.1; background-image: radial-gradient(circle at 3px 3px, rgba(251, 191, 36, 0.6) 1.5px, transparent 0); background-size: 50px 50px;"></div>
+                                
+                                <!-- Decorative Glow Elements (Yellow/Gold) -->
+                                <div style="position: absolute; top: -120px; right: -120px; width: 500px; height: 500px; background: radial-gradient(circle, rgba(251, 191, 36, 0.3) 0%, transparent 70%); border-radius: 50%; filter: blur(40px);"></div>
+                                <div style="position: absolute; bottom: -180px; left: -180px; width: 600px; height: 600px; background: radial-gradient(circle, rgba(245, 158, 11, 0.25) 0%, transparent 70%); border-radius: 50%; filter: blur(50px);"></div>
+                                <div style="position: absolute; top: 20%; left: -50px; width: 300px; height: 300px; background: radial-gradient(circle, rgba(251, 191, 36, 0.2) 0%, transparent 70%); border-radius: 50%; filter: blur(30px);"></div>
+                                <div style="position: absolute; bottom: 10%; right: -80px; width: 400px; height: 400px; background: radial-gradient(circle, rgba(245, 158, 11, 0.2) 0%, transparent 70%); border-radius: 50%; filter: blur(35px);"></div>
+                                
+                                <!-- Animated Upward Trend Arrow (Gold) -->
+                                <div style="position: absolute; top: 45%; right: 20px; transform: translateY(-50%) rotate(45deg); width: 250px; height: 250px; opacity: 0.15; animation: float 6s ease-in-out infinite;">
+                                    <svg viewBox="0 0 100 100" style="width: 100%; height: 100%;">
+                                        <defs>
+                                            <linearGradient id="arrowGradientGold" x1="0%" y1="0%" x2="100%" y2="100%">
+                                                <stop offset="0%" style="stop-color:#fbbf24;stop-opacity:1" />
+                                                <stop offset="50%" style="stop-color:#f59e0b;stop-opacity:1" />
+                                                <stop offset="100%" style="stop-color:#d97706;stop-opacity:1" />
+                                            </linearGradient>
+                                        </defs>
+                                        <path d="M 50 5 L 95 50 L 75 50 L 75 95 L 25 95 L 25 50 L 5 50 Z" fill="url(#arrowGradientGold)" stroke="#fbbf24" stroke-width="2"/>
+                                    </svg>
+                                </div>
+                                
+                                <!-- Shimmer Effect (Gold) -->
+                                <div style="position: absolute; top: 0; left: -100%; width: 100%; height: 100%; background: linear-gradient(90deg, transparent, rgba(251, 191, 36, 0.2), transparent); animation: shimmer 3s infinite;"></div>
+                                
+                                <!-- Logo and Branding -->
+                                <div class="d-flex align-items-center mb-4" style="position: relative; z-index: 2;">
+                                    <div style="background: linear-gradient(135deg, #10b981 0%, #059669 50%, #047857 100%); padding: 14px 18px; border-radius: 14px; margin-right: 15px; box-shadow: 0 6px 20px rgba(16, 185, 129, 0.4), inset 0 1px 5px rgba(255,255,255,0.2), 0 0 25px rgba(16, 185, 129, 0.3); position: relative; overflow: hidden; border: 2px solid rgba(255,255,255,0.3);">
+                                        <div style="position: absolute; top: -50%; left: -50%; width: 200%; height: 200%; background: linear-gradient(45deg, transparent, rgba(255,255,255,0.3), transparent); animation: shine 3s infinite;"></div>
+                                        <i class="fas fa-chart-line" style="font-size: 26px; color: white; position: relative; z-index: 1; text-shadow: 0 2px 6px rgba(0,0,0,0.2);"></i>
+                                    </div>
+                                    <div>
+                                        <div style="color: #78350f; font-size: 24px; font-weight: 900; letter-spacing: 1px; margin-bottom: 4px; text-shadow: 0 1px 5px rgba(0,0,0,0.1);">NpLTrader</div>
+                                        <div style="color: #92400e; font-size: 11px; font-weight: 600; letter-spacing: 0.3px; text-shadow: 0 1px 2px rgba(0,0,0,0.1);">Professional Trading Journal & Analytics Platform</div>
+                                    </div>
+                                </div>
+                                
+                                <!-- Withdrawal Details -->
+                                <div style="position: relative; z-index: 2;">
+                                    <div style="background: rgba(255,255,255,0.95); backdrop-filter: blur(20px); border-radius: 16px; padding: 28px; margin-bottom: 25px; border: 2px solid rgba(251, 191, 36, 0.5); box-shadow: 0 10px 35px rgba(0,0,0,0.15), inset 0 1px 5px rgba(255,255,255,0.5), 0 0 35px rgba(251, 191, 36, 0.25); position: relative; overflow: hidden;">
+                                        <!-- Inner glow (White/Yellow) -->
+                                        <div style="position: absolute; top: -50%; right: -50%; width: 200%; height: 200%; background: radial-gradient(circle, rgba(255, 255, 255, 0.3) 0%, transparent 70%);"></div>
+                                        
+                                        <div style="position: relative; z-index: 1;">
+                                            <div style="display: flex; align-items: center; gap: 8px; margin-bottom: 18px;">
+                                                <div style="background: linear-gradient(135deg, #10b981 0%, #059669 100%); padding: 8px 14px; border-radius: 8px; box-shadow: 0 4px 12px rgba(16, 185, 129, 0.3), 0 0 20px rgba(16, 185, 129, 0.15);">
+                                                    <i class="fas fa-check-circle" style="color: white; font-size: 14px; margin-right: 6px; text-shadow: 0 1px 3px rgba(0,0,0,0.2);"></i>
+                                                    <span style="color: white; font-size: 12px; font-weight: 700; text-transform: uppercase; letter-spacing: 1px; text-shadow: 0 1px 3px rgba(0,0,0,0.2);">Withdrawal Success</span>
+                                                </div>
+                                            </div>
+                                            
+                                            <div style="font-size: 56px; font-weight: 900; color: #10b981; margin-bottom: 12px; line-height: 1; letter-spacing: -1px; text-shadow: 0 3px 15px rgba(16, 185, 129, 0.4), 0 0 25px rgba(16, 185, 129, 0.3);" id="shareCardAmount">
+                                                +$0.00
+                                            </div>
+                                            
+                                            <div style="display: flex; align-items: center; gap: 8px; margin-bottom: 25px; padding: 10px 16px; background: rgba(16, 185, 129, 0.1); border-radius: 8px; border: 2px solid rgba(16, 185, 129, 0.2);">
+                                                <div style="color: #047857; font-size: 15px; font-weight: 700; text-shadow: 0 1px 3px rgba(16, 185, 129, 0.2);" id="shareCardCurrency">USD</div>
+                                                <div style="width: 4px; height: 4px; background: #10b981; border-radius: 50%; box-shadow: 0 0 8px rgba(16, 185, 129, 0.5);"></div>
+                                                <div style="color: #065f46; font-size: 12px; font-weight: 600; text-shadow: 0 1px 2px rgba(16, 185, 129, 0.2);">Withdrawal</div>
+                                            </div>
+                                            
+                                            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin-top: 20px; padding-top: 20px; border-top: 2px solid rgba(251, 191, 36, 0.3);">
+                                                <div style="padding: 10px; background: rgba(251, 191, 36, 0.1); border-radius: 8px; border: 2px solid rgba(251, 191, 36, 0.2);">
+                                                    <div style="color: #92400e; font-size: 9px; text-transform: uppercase; letter-spacing: 0.8px; margin-bottom: 6px; font-weight: 600;">Account Name</div>
+                                                    <div style="color: #78350f; font-size: 14px; font-weight: 700; text-shadow: 0 1px 3px rgba(0,0,0,0.1); line-height: 1.2; word-break: break-word;" id="shareCardAccount">-</div>
+                                                </div>
+                                                <div style="padding: 10px; background: rgba(251, 191, 36, 0.1); border-radius: 8px; border: 2px solid rgba(251, 191, 36, 0.2);">
+                                                    <div style="color: #92400e; font-size: 9px; text-transform: uppercase; letter-spacing: 0.8px; margin-bottom: 6px; font-weight: 600;">Platform</div>
+                                                    <div style="color: #78350f; font-size: 14px; font-weight: 700; text-shadow: 0 1px 3px rgba(0,0,0,0.1); line-height: 1.2; word-break: break-word;" id="shareCardPlatform">-</div>
+                                                </div>
+                                            </div>
+                                            
+                                            <div style="margin-top: 15px; padding: 12px; background: rgba(251, 191, 36, 0.1); border-radius: 8px; border: 2px solid rgba(251, 191, 36, 0.2); border-top: 2px solid rgba(251, 191, 36, 0.3);">
+                                                <div style="color: #92400e; font-size: 9px; text-transform: uppercase; letter-spacing: 0.8px; margin-bottom: 6px; font-weight: 600;">Withdrawal Date</div>
+                                                <div style="color: #78350f; font-size: 14px; font-weight: 700; text-shadow: 0 1px 3px rgba(0,0,0,0.1);" id="shareCardDate">-</div>
+                                            </div>
+                                        </div>
+                                    </div>
+                                    
+                                    <!-- User Info -->
+                                    <div style="display: flex; align-items: center; background: rgba(255,255,255,0.95); backdrop-filter: blur(20px); border-radius: 14px; padding: 14px; border: 2px solid rgba(251, 191, 36, 0.5); box-shadow: 0 10px 30px rgba(0,0,0,0.15), inset 0 1px 5px rgba(255,255,255,0.5), 0 0 30px rgba(251, 191, 36, 0.25);">
+                                        <?php 
+                                        $profile_image = $user['profile_image'] ?? null;
+                                        $profile_image_path = $profile_image ? __DIR__.'/../' . $profile_image : null;
+                                        ?>
+                                        <div class="user-avatar me-2" style="width: 45px; height: 45px; background: linear-gradient(135deg, #fbbf24 0%, #f59e0b 50%, #d97706 100%); color: white; display: flex; align-items: center; justify-content: center; font-weight: bold; font-size: 18px; box-shadow: 0 4px 15px rgba(251, 191, 36, 0.5), 0 0 20px rgba(251, 191, 36, 0.3), inset 0 1px 3px rgba(255,255,255,0.3); flex-shrink: 0; border: 2px solid rgba(255,255,255,0.2);">
+                                            <?php if (!empty($profile_image) && $profile_image_path && file_exists($profile_image_path)): ?>
+                                                <img src="../<?php echo htmlspecialchars($profile_image); ?>" alt="Profile" style="width: 100%; height: 100%; object-fit: cover; border-radius: 50%;">
+                                            <?php else: ?>
+                                                <?php echo strtoupper(substr($user['username'], 0, 1)); ?>
+                                            <?php endif; ?>
+                                        </div>
+                                        <div style="flex: 1; min-width: 0; padding-right: 10px; overflow: hidden;">
+                                            <div style="color: #78350f; font-weight: 700; font-size: 16px; margin-bottom: 4px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; text-shadow: 0 1px 3px rgba(0,0,0,0.1); line-height: 1.2; display: block; width: 100%;" id="shareCardUsername"><?php echo htmlspecialchars($user['username']); ?></div>
+                                            <div style="color: #92400e; font-size: 11px; font-weight: 500; text-shadow: 0 1px 2px rgba(0,0,0,0.1);" id="shareCardTimestamp">-</div>
+                                        </div>
+                                        <div style="text-align: right; flex-shrink: 0; margin-left: 10px;">
+                                            <div style="background: linear-gradient(135deg, #fbbf24 0%, #f59e0b 50%, #d97706 100%); padding: 8px 12px; border-radius: 8px; display: inline-block; box-shadow: 0 4px 12px rgba(251, 191, 36, 0.4), 0 0 15px rgba(251, 191, 36, 0.2), inset 0 1px 3px rgba(255,255,255,0.2); border: 1px solid rgba(255,255,255,0.2);">
+                                                <span style="color: white; font-size: 14px; font-weight: 800; letter-spacing: 1.5px; text-shadow: 0 1px 5px rgba(0,0,0,0.2);">NpL</span>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                                
+                                <!-- Website URL and Verification Badge -->
+                                <div style="position: absolute; bottom: 25px; left: 40px; right: 40px; display: flex; justify-content: space-between; align-items: center; z-index: 2;">
+                                    <a href="https://www.npltrader.com" target="_blank" style="color: #78350f; font-size: 11px; font-weight: 700; letter-spacing: 0.5px; display: flex; align-items: center; gap: 6px; text-shadow: 0 1px 2px rgba(0,0,0,0.1); text-decoration: none; transition: all 0.3s; padding: 6px 12px; background: rgba(255,255,255,0.85); border-radius: 15px; border: 2px solid rgba(251, 191, 36, 0.3);">
+                                        <i class="fas fa-globe" style="font-size: 12px; color: #10b981; text-shadow: 0 0 6px rgba(16, 185, 129, 0.3);"></i>
+                                        <span>www.npltrader.com</span>
+                                    </a>
+                                    <a href="https://www.npltrader.com/verify" target="_blank" id="verificationLink" style="display: flex; align-items: center; gap: 6px; background: linear-gradient(135deg, #10b981 0%, #059669 100%); padding: 6px 12px; border-radius: 18px; border: 2px solid rgba(255,255,255,0.25); box-shadow: 0 3px 10px rgba(16, 185, 129, 0.4), inset 0 1px 0 rgba(255,255,255,0.15); text-decoration: none; transition: all 0.3s; cursor: pointer;">
+                                        <i class="fas fa-check-circle" style="color: white; font-size: 12px; text-shadow: 0 0 8px rgba(255,255,255,0.4);"></i>
+                                        <span style="color: white; font-size: 10px; font-weight: 700; letter-spacing: 0.8px; text-shadow: 0 1px 3px rgba(0,0,0,0.2);">VERIFIED</span>
+                                    </a>
+                                </div>
+                            </div>
+                            
+                            <!-- Format Selection -->
+                            <div class="mt-4">
+                                <label class="text-muted mb-2 d-block">Select Format:</label>
+                                <div class="d-flex gap-2">
+                                    <button class="btn btn-outline-warning format-btn" data-format="story" data-width="1080" data-height="1920">
+                                        Story<br><small>1080x1920</small>
+                                    </button>
+                                    <button class="btn btn-warning format-btn active" data-format="post" data-width="1080" data-height="1080">
+                                        Post<br><small>1080x1080</small>
+                                    </button>
+                                    <button class="btn btn-outline-warning format-btn" data-format="landscape" data-width="1920" data-height="1080">
+                                        Landscape<br><small>1920x1080</small>
+                                    </button>
+                                </div>
+                            </div>
+                            
+                            <!-- Action Buttons -->
+                            <div class="d-flex gap-2 mt-4">
+                                <button class="btn btn-light flex-fill" id="downloadShareCardBtn">
+                                    <i class="fas fa-download me-2"></i>Download
+                                </button>
+                                <button class="btn btn-warning flex-fill" id="shareShareCardBtn">
+                                    <i class="fas fa-share-alt me-2"></i>Share
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+    
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
     <script>
+        // Share Withdrawal Functionality - Function already defined in head section
+        // Variables are already defined globally in head section
+        
         // Motivational Quotes
         const quotes = <?php echo json_encode($quotes); ?>;
         
@@ -2360,34 +3029,39 @@ $random_quote = $quotes[array_rand($quotes)];
                     }
                 }
             });
-        }
+        
         <?php endif; ?>
         
         // Status Chart
         <?php if (!empty($status_breakdown)): ?>
         const statusCtx = document.getElementById('statusChart');
         if (statusCtx) {
+            // Status color mapping
+            const statusColors = {
+                'active': { bg: 'rgba(16, 185, 129, 0.8)', border: '#10b981' },
+                'ongoing': { bg: 'rgba(59, 130, 246, 0.8)', border: '#3b82f6' },
+                'breach': { bg: 'rgba(239, 68, 68, 0.8)', border: '#ef4444' },
+                'loss': { bg: 'rgba(239, 68, 68, 0.8)', border: '#ef4444' },
+                'inactive': { bg: 'rgba(148, 163, 184, 0.8)', border: '#94a3b8' },
+                'closed': { bg: 'rgba(245, 158, 11, 0.8)', border: '#f59e0b' }
+            };
+            
+            const statusLabels = <?php echo json_encode(array_map(function($s) { return ucfirst($s['status']); }, $status_breakdown)); ?>;
+            const statusData = <?php echo json_encode(array_column($status_breakdown, 'count')); ?>;
+            const statusValues = <?php echo json_encode(array_map(function($s) { return strtolower($s['status']); }, $status_breakdown)); ?>;
+            
+            const bgColors = statusValues.map(s => statusColors[s]?.bg || 'rgba(148, 163, 184, 0.8)');
+            const borderColors = statusValues.map(s => statusColors[s]?.border || '#94a3b8');
+            
             new Chart(statusCtx, {
                 type: 'bar',
                 data: {
-                    labels: <?php echo json_encode(array_map(function($s) { return ucfirst($s['status']); }, $status_breakdown)); ?>,
+                    labels: statusLabels,
                     datasets: [{
                         label: 'Account Count',
-                        data: <?php echo json_encode(array_column($status_breakdown, 'count')); ?>,
-                        backgroundColor: [
-                            'rgba(16, 185, 129, 0.8)',   // active
-                            'rgba(59, 130, 246, 0.8)',   // ongoing
-                            'rgba(239, 68, 68, 0.8)',    // breach
-                            'rgba(148, 163, 184, 0.8)',  // inactive
-                            'rgba(245, 158, 11, 0.8)'    // closed
-                        ],
-                        borderColor: [
-                            '#10b981',
-                            '#3b82f6',
-                            '#ef4444',
-                            '#94a3b8',
-                            '#f59e0b'
-                        ],
+                        data: statusData,
+                        backgroundColor: bgColors,
+                        borderColor: borderColors,
                         borderWidth: 2
                     }]
                 },
@@ -2424,6 +3098,493 @@ $random_quote = $quotes[array_rand($quotes)];
         }
         <?php endif; ?>
         
+        // Share Withdrawal Functionality - Duplicate removed, using the one defined earlier
+        
+        // Update share card content - Duplicate removed, using the one defined in head section
+        
+        // Format selection - improved handler
+        document.addEventListener('click', function(e) {
+            const formatBtn = e.target.closest('.format-btn');
+            if (formatBtn) {
+                e.preventDefault();
+                e.stopPropagation();
+                
+                console.log('Format button clicked:', formatBtn.getAttribute('data-format'));
+                
+                // Remove active class from all buttons
+                document.querySelectorAll('.format-btn').forEach(b => {
+                    b.classList.remove('active', 'btn-warning');
+                    b.classList.add('btn-outline-warning');
+                });
+                
+                // Add active class to clicked button
+                formatBtn.classList.add('active', 'btn-warning');
+                formatBtn.classList.remove('btn-outline-warning');
+                
+                // Update current format
+                currentFormat = formatBtn.getAttribute('data-format');
+                console.log('Current format set to:', currentFormat);
+                
+                // Update card dimensions
+                updateCardDimensions();
+            }
+        });
+        
+        // Update card dimensions
+        function updateCardDimensions() {
+            console.log('updateCardDimensions called, format:', currentFormat);
+            const card = document.getElementById('shareCardPreview');
+            if (!card) {
+                console.error('shareCardPreview element not found');
+                return;
+            }
+            
+            const formatBtn = document.querySelector(`.format-btn[data-format="${currentFormat}"]`);
+            if (!formatBtn) {
+                console.error('Format button not found for:', currentFormat);
+                return;
+            }
+            
+            const width = parseInt(formatBtn.getAttribute('data-width')) || 1080;
+            const height = parseInt(formatBtn.getAttribute('data-height')) || 1080;
+            
+            console.log('Updating card dimensions:', width, 'x', height);
+            
+            // Calculate aspect ratio
+            const aspectRatio = width / height;
+            const maxWidth = 600; // Max width for preview
+            const calculatedHeight = maxWidth / aspectRatio;
+            
+            card.style.width = maxWidth + 'px';
+            card.style.height = calculatedHeight + 'px';
+            card.style.minHeight = calculatedHeight + 'px';
+            
+            console.log('Card dimensions updated to:', maxWidth, 'x', calculatedHeight);
+        }
+        
+        // Download share card - improved handler with direct button click
+        function setupDownloadButton() {
+            const downloadBtn = document.getElementById('downloadShareCardBtn');
+            if (!downloadBtn) {
+                console.log('Download button not found, will retry...');
+                return;
+            }
+            
+            // Remove any existing listeners by cloning
+            const newBtn = downloadBtn.cloneNode(true);
+            downloadBtn.parentNode.replaceChild(newBtn, downloadBtn);
+            
+            newBtn.addEventListener('click', function(e) {
+                e.preventDefault();
+                e.stopPropagation();
+                
+                console.log('Download button clicked directly');
+                
+                const card = document.getElementById('shareCardPreview');
+                if (!card) {
+                    console.error('shareCardPreview not found');
+                    alert('Card preview not found. Please open the share modal first.');
+                    return false;
+                }
+                
+                // Get current format or default to 'post'
+                let formatBtn = document.querySelector('.format-btn.active');
+                if (!formatBtn) {
+                    formatBtn = document.querySelector('.format-btn[data-format="post"]');
+                }
+                if (!formatBtn) {
+                    formatBtn = document.querySelector('.format-btn');
+                }
+                
+                // Get the actual visible dimensions of the card
+                const cardRect = card.getBoundingClientRect();
+                const actualWidth = cardRect.width;
+                const actualHeight = cardRect.height;
+                
+                console.log('Card visible dimensions:', actualWidth, 'x', actualHeight);
+                
+                // Get format dimensions for final output
+                const formatWidth = formatBtn ? parseInt(formatBtn.getAttribute('data-width')) || 1080 : 1080;
+                const formatHeight = formatBtn ? parseInt(formatBtn.getAttribute('data-height')) || 1080 : 1080;
+                
+                console.log('Format dimensions:', formatWidth, 'x', formatHeight);
+                
+                // Show loading
+                const btn = this;
+                const originalText = btn.innerHTML;
+                btn.innerHTML = '<i class="fas fa-spinner fa-spin me-2"></i>Downloading...';
+                btn.disabled = true;
+                
+                // Check if html2canvas is loaded
+                if (typeof html2canvas === 'undefined') {
+                    alert('Image generation library not loaded. Please refresh the page.');
+                    btn.innerHTML = originalText;
+                    btn.disabled = false;
+                    return false;
+                }
+                
+                // Store original card styles
+                const originalWidth = card.style.width;
+                const originalHeight = card.style.height;
+                const originalMaxWidth = card.style.maxWidth;
+                const originalTransform = card.style.transform;
+                
+                // Temporarily resize card to format dimensions for capture
+                card.style.width = formatWidth + 'px';
+                card.style.height = formatHeight + 'px';
+                card.style.maxWidth = 'none';
+                card.style.transform = 'none';
+                
+                // Wait a bit for resize to take effect
+                setTimeout(() => {
+                    html2canvas(card, {
+                        width: formatWidth,
+                        height: formatHeight,
+                        scale: 2,
+                        backgroundColor: '#fef3c7',
+                        useCORS: true,
+                        logging: false,
+                        allowTaint: false,
+                        windowWidth: formatWidth,
+                        windowHeight: formatHeight,
+                        onclone: function(clonedDoc) {
+                            // Ensure all styles are preserved in clone
+                            const clonedCard = clonedDoc.getElementById('shareCardPreview');
+                            if (clonedCard) {
+                                clonedCard.style.width = formatWidth + 'px';
+                                clonedCard.style.height = formatHeight + 'px';
+                                clonedCard.style.maxWidth = 'none';
+                                clonedCard.style.display = 'block';
+                                clonedCard.style.visibility = 'visible';
+                                clonedCard.style.transform = 'none';
+                            }
+                        }
+                    }).then(canvas => {
+                        // Restore original card styles
+                        card.style.width = originalWidth;
+                        card.style.height = originalHeight;
+                        card.style.maxWidth = originalMaxWidth;
+                        card.style.transform = originalTransform;
+                        
+                        // Update card dimensions back to preview size
+                        if (typeof updateCardDimensions === 'function') {
+                            updateCardDimensions();
+                        }
+                        
+                        try {
+                            console.log('Canvas created, size:', canvas.width, 'x', canvas.height);
+                            
+                            // Convert canvas to blob
+                            canvas.toBlob(function(blob) {
+                                if (!blob) {
+                                    throw new Error('Failed to create blob from canvas');
+                                }
+                                
+                                console.log('Blob created, size:', blob.size, 'bytes');
+                                
+                                const url = URL.createObjectURL(blob);
+                                const link = document.createElement('a');
+                                const withdrawalId = currentWithdrawalData && currentWithdrawalData.id ? currentWithdrawalData.id : 'share';
+                                const format = formatBtn ? formatBtn.getAttribute('data-format') || 'post' : 'post';
+                                const filename = `withdrawal-${withdrawalId}-${format}-${Date.now()}.png`;
+                                
+                                link.download = filename;
+                                link.href = url;
+                                link.style.display = 'none';
+                                
+                                document.body.appendChild(link);
+                                
+                                // Trigger download
+                                setTimeout(() => {
+                                    link.click();
+                                    console.log('Download triggered for:', filename);
+                                    
+                                    // Clean up after a delay
+                                    setTimeout(() => {
+                                        if (document.body.contains(link)) {
+                                            document.body.removeChild(link);
+                                        }
+                                        URL.revokeObjectURL(url);
+                                        console.log('Cleanup completed');
+                                    }, 200);
+                                }, 100);
+                                
+                                btn.innerHTML = originalText;
+                                btn.disabled = false;
+                            }, 'image/png', 1.0);
+                        } catch (error) {
+                            // Restore original card styles even on error
+                            card.style.width = originalWidth;
+                            card.style.height = originalHeight;
+                            card.style.maxWidth = originalMaxWidth;
+                            card.style.transform = originalTransform;
+                            
+                            if (typeof updateCardDimensions === 'function') {
+                                updateCardDimensions();
+                            }
+                            
+                            console.error('Download error:', error);
+                            alert('Error downloading image: ' + error.message);
+                            btn.innerHTML = originalText;
+                            btn.disabled = false;
+                        }
+                    }).catch(error => {
+                        // Restore original card styles even on error
+                        card.style.width = originalWidth;
+                        card.style.height = originalHeight;
+                        card.style.maxWidth = originalMaxWidth;
+                        card.style.transform = originalTransform;
+                        
+                        if (typeof updateCardDimensions === 'function') {
+                            updateCardDimensions();
+                        }
+                        
+                        console.error('html2canvas error:', error);
+                        alert('Error generating image: ' + error.message + '\n\nPlease try again or refresh the page.');
+                        btn.innerHTML = originalText;
+                        btn.disabled = false;
+                    });
+                }, 100);
+                
+                return false;
+            });
+        }
+        
+        // Initialize download button when DOM is ready
+        if (document.readyState === 'loading') {
+            document.addEventListener('DOMContentLoaded', setupDownloadButton);
+        } else {
+            setupDownloadButton();
+        }
+        
+        // Also setup when modal is shown (in case button is added dynamically)
+        const shareModal = document.getElementById('shareWithdrawalModal');
+        if (shareModal) {
+            shareModal.addEventListener('shown.bs.modal', function() {
+                setTimeout(setupDownloadButton, 100);
+            });
+        }
+        
+        // Share share card - improved handler (event delegation)
+        document.addEventListener('click', function(e) {
+            if (e.target.closest('#shareShareCardBtn')) {
+                e.preventDefault();
+                e.stopPropagation();
+                
+                console.log('Share button clicked');
+                
+                const card = document.getElementById('shareCardPreview');
+                if (!card) {
+                    console.error('shareCardPreview not found');
+                    alert('Card preview not found');
+                    return;
+                }
+                
+                const formatBtn = document.querySelector(`.format-btn[data-format="${currentFormat}"]`);
+                if (!formatBtn) {
+                    console.error('Format button not found');
+                    alert('Please select a format first');
+                    return;
+                }
+                
+                const width = parseInt(formatBtn.getAttribute('data-width')) || 1080;
+                const height = parseInt(formatBtn.getAttribute('data-height')) || 1080;
+                
+                console.log('Sharing with dimensions:', width, 'x', height);
+                
+                // Show loading
+                const btn = e.target.closest('#shareShareCardBtn');
+                const originalText = btn.innerHTML;
+                btn.innerHTML = '<i class="fas fa-spinner fa-spin me-2"></i>Sharing...';
+                btn.disabled = true;
+                
+                html2canvas(card, {
+                    width: width,
+                    height: height,
+                    scale: 2,
+                    backgroundColor: '#fef3c7',
+                    useCORS: true,
+                    logging: false,
+                    allowTaint: false
+                }).then(canvas => {
+                    canvas.toBlob(function(blob) {
+                        if (!blob) {
+                            console.error('Failed to create blob');
+                            alert('Error creating image. Please try again.');
+                            btn.innerHTML = originalText;
+                            btn.disabled = false;
+                            return;
+                        }
+                        
+                        // Try native share API first
+                        if (navigator.share) {
+                            const file = new File([blob], `withdrawal-${currentFormat}.png`, { type: 'image/png' });
+                            const shareData = {
+                                title: 'My Withdrawal - NpLTrader',
+                                text: `Withdrew $${(currentWithdrawalData.amount || 0).toFixed(2)} from ${currentWithdrawalData.account || 'account'}`,
+                                files: [file]
+                            };
+                            
+                            // Check if can share files
+                            if (navigator.canShare && navigator.canShare(shareData)) {
+                                navigator.share(shareData).then(() => {
+                                    console.log('Shared successfully');
+                                    btn.innerHTML = originalText;
+                                    btn.disabled = false;
+                                }).catch(err => {
+                                    console.log('Share cancelled or error:', err);
+                                    if (err.name !== 'AbortError') {
+                                        // Only show fallback if it's not user cancellation
+                                        showShareOptions(canvas, blob);
+                                    } else {
+                                        btn.innerHTML = originalText;
+                                        btn.disabled = false;
+                                    }
+                                });
+                            } else {
+                                // Try without files (text only)
+                                navigator.share({
+                                    title: 'My Withdrawal - NpLTrader',
+                                    text: `Withdrew $${(currentWithdrawalData.amount || 0).toFixed(2)} from ${currentWithdrawalData.account || 'account'}`,
+                                    url: window.location.href
+                                }).then(() => {
+                                    console.log('Shared successfully (text only)');
+                                    // Also download the image
+                                    downloadImage(blob);
+                                    btn.innerHTML = originalText;
+                                    btn.disabled = false;
+                                }).catch(() => {
+                                    showShareOptions(canvas, blob);
+                                });
+                            }
+                        } else {
+                            // No native share API, show custom share options
+                            showShareOptions(canvas, blob);
+                        }
+                    }, 'image/png', 1.0);
+                }).catch(error => {
+                    console.error('html2canvas error:', error);
+                    alert('Error generating image: ' + error.message);
+                    btn.innerHTML = originalText;
+                    btn.disabled = false;
+                });
+            }
+        });
+        
+        function downloadImage(blob) {
+            const url = URL.createObjectURL(blob);
+            const link = document.createElement('a');
+            link.download = `withdrawal-${currentWithdrawalData.id || 'share'}-${currentFormat}-${Date.now()}.png`;
+            link.href = url;
+            link.style.display = 'none';
+            document.body.appendChild(link);
+            link.click();
+            setTimeout(() => {
+                document.body.removeChild(link);
+                URL.revokeObjectURL(url);
+            }, 100);
+        }
+        
+        function showShareOptions(canvas, blob) {
+            // Create share options modal
+            const shareModal = document.createElement('div');
+            shareModal.id = 'shareOptionsModal';
+            shareModal.style.cssText = 'position: fixed; top: 0; left: 0; right: 0; bottom: 0; background: rgba(0,0,0,0.7); z-index: 9999; display: flex; align-items: center; justify-content: center;';
+            
+            shareModal.innerHTML = `
+                <div style="background: var(--dark-card); border-radius: 16px; padding: 30px; max-width: 400px; width: 90%; border: 2px solid var(--border-color); box-shadow: 0 20px 60px rgba(0,0,0,0.5);">
+                    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px;">
+                        <h5 style="color: var(--text-primary); margin: 0;">Share Image</h5>
+                        <button type="button" class="btn-close btn-close-white" onclick="this.closest('#shareOptionsModal').remove()"></button>
+                    </div>
+                    <div style="display: flex; flex-direction: column; gap: 12px;">
+                        <button class="btn btn-primary share-option-btn" data-action="copy" style="width: 100%; padding: 12px; text-align: left;">
+                            <i class="fas fa-copy me-2"></i>Copy to Clipboard
+                        </button>
+                        <button class="btn btn-success share-option-btn" data-action="download" style="width: 100%; padding: 12px; text-align: left;">
+                            <i class="fas fa-download me-2"></i>Download Image
+                        </button>
+                        <button class="btn btn-info share-option-btn" data-action="whatsapp" style="width: 100%; padding: 12px; text-align: left;">
+                            <i class="fab fa-whatsapp me-2"></i>Share on WhatsApp
+                        </button>
+                        <button class="btn btn-primary share-option-btn" data-action="facebook" style="width: 100%; padding: 12px; text-align: left;">
+                            <i class="fab fa-facebook me-2"></i>Share on Facebook
+                        </button>
+                        <button class="btn btn-info share-option-btn" data-action="twitter" style="width: 100%; padding: 12px; text-align: left;">
+                            <i class="fab fa-twitter me-2"></i>Share on Twitter
+                        </button>
+                    </div>
+                </div>
+            `;
+            
+            document.body.appendChild(shareModal);
+            
+            // Handle share option clicks
+            shareModal.querySelectorAll('.share-option-btn').forEach(btn => {
+                btn.addEventListener('click', function() {
+                    const action = this.getAttribute('data-action');
+                    handleShareAction(action, canvas, blob);
+                    shareModal.remove();
+                });
+            });
+            
+            // Close on background click
+            shareModal.addEventListener('click', function(e) {
+                if (e.target === shareModal) {
+                    shareModal.remove();
+                }
+            });
+            
+            // Reset share button
+            const shareBtn = document.getElementById('shareShareCardBtn');
+            if (shareBtn) {
+                shareBtn.innerHTML = '<i class="fas fa-share-alt me-2"></i>Share';
+                shareBtn.disabled = false;
+            }
+        }
+        
+        function handleShareAction(action, canvas, blob) {
+            switch(action) {
+                case 'copy':
+                    if (navigator.clipboard && navigator.clipboard.write) {
+                        navigator.clipboard.write([
+                            new ClipboardItem({ 'image/png': blob })
+                        ]).then(() => {
+                            alert('Image copied to clipboard! You can paste it anywhere.');
+                        }).catch(() => {
+                            downloadImage(blob);
+                            alert('Clipboard not available. Image downloaded instead.');
+                        });
+                    } else {
+                        downloadImage(blob);
+                        alert('Clipboard not available. Image downloaded instead.');
+                    }
+                    break;
+                    
+                case 'download':
+                    downloadImage(blob);
+                    break;
+                    
+                case 'whatsapp':
+                    const whatsappUrl = `https://wa.me/?text=${encodeURIComponent('Check out my withdrawal from NpLTrader!')}`;
+                    window.open(whatsappUrl, '_blank');
+                    setTimeout(() => downloadImage(blob), 500);
+                    break;
+                    
+                case 'facebook':
+                    const fbUrl = `https://www.facebook.com/sharer/sharer.php?u=${encodeURIComponent(window.location.href)}`;
+                    window.open(fbUrl, '_blank');
+                    setTimeout(() => downloadImage(blob), 500);
+                    break;
+                    
+                case 'twitter':
+                    const twitterUrl = `https://twitter.com/intent/tweet?text=${encodeURIComponent('Check out my withdrawal from NpLTrader!')}&url=${encodeURIComponent(window.location.href)}`;
+                    window.open(twitterUrl, '_blank');
+                    setTimeout(() => downloadImage(blob), 500);
+                    break;
+            }
+        }
+        
         // Sidebar toggle functionality
         function toggleSidebar() {
             const sidebar = document.getElementById('sidebar');
@@ -2440,7 +3601,7 @@ $random_quote = $quotes[array_rand($quotes)];
                 sidebar.style.transform = 'translateX(0)';
                 
                 if (mainContent) {
-                if (window.innerWidth > 768) {
+                    if (window.innerWidth > 768) {
                         mainContent.style.marginLeft = '280px';
                         mainContent.style.transition = 'margin-left 0.3s ease';
                     } else {
@@ -2452,7 +3613,7 @@ $random_quote = $quotes[array_rand($quotes)];
                     toggleBtn.classList.remove('show');
                     toggleBtn.style.display = 'none';
                 }
-                    } else {
+            } else {
                 sidebar.classList.add('closed');
                 sidebar.classList.remove('show');
                 sidebar.style.transform = 'translateX(-100%)';
@@ -2540,7 +3701,80 @@ $random_quote = $quotes[array_rand($quotes)];
                 }
             });
         });
+        
+        // Share Withdrawal Functionality - Duplicate removed, using the one above
+            const amount = currentWithdrawalData.amount || 0;
+            const currency = currentWithdrawalData.currency || 'USD';
+            
+            // Format amount with proper spacing
+            const formattedAmount = amount.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+            document.getElementById('shareCardAmount').textContent = `+$${formattedAmount}`;
+            document.getElementById('shareCardCurrency').textContent = currency;
+            document.getElementById('shareCardAccount').textContent = currentWithdrawalData.account || 'N/A';
+            document.getElementById('shareCardPlatform').textContent = currentWithdrawalData.platform || 'N/A';
+            document.getElementById('shareCardDate').textContent = currentWithdrawalData.date || '';
+            
+            // Username is already set in PHP, but ensure it's visible
+            const usernameEl = document.getElementById('shareCardUsername');
+            if (usernameEl) {
+                usernameEl.style.display = 'block';
+                usernameEl.style.visibility = 'visible';
+                usernameEl.style.opacity = '1';
+            }
+            
+            const now = new Date();
+            const timestamp = now.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }) + ' at ' + 
+                            now.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', hour12: true });
+            document.getElementById('shareCardTimestamp').textContent = timestamp;
+            
+            // Update verification link with withdrawal ID
+            const verificationLink = document.getElementById('verificationLink');
+            if (verificationLink && currentWithdrawalData.id) {
+                verificationLink.href = `https://www.npltrader.com/verify?id=${currentWithdrawalData.id}`;
+            }
+            
+            // Update card dimensions based on format
+            updateCardDimensions();
+        }
+        
+        // Format selection
+        document.addEventListener('click', function(e) {
+            if (e.target.closest('.format-btn')) {
+                const btn = e.target.closest('.format-btn');
+                document.querySelectorAll('.format-btn').forEach(b => {
+                    b.classList.remove('active', 'btn-warning');
+                    b.classList.add('btn-outline-warning');
+                });
+                btn.classList.add('active', 'btn-warning');
+                btn.classList.remove('btn-outline-warning');
+                
+                currentFormat = btn.getAttribute('data-format');
+                updateCardDimensions();
+            }
+        });
+        
+        // Update card dimensions
+        function updateCardDimensions() {
+            const card = document.getElementById('shareCardPreview');
+            const formatBtn = document.querySelector(`.format-btn[data-format="${currentFormat}"]`);
+            
+            if (formatBtn) {
+                const width = formatBtn.getAttribute('data-width');
+                const height = formatBtn.getAttribute('data-height');
+                
+                // Calculate aspect ratio
+                const aspectRatio = parseInt(width) / parseInt(height);
+                const maxWidth = 600; // Max width for preview
+                const calculatedHeight = maxWidth / aspectRatio;
+                
+                card.style.width = maxWidth + 'px';
+                card.style.height = calculatedHeight + 'px';
+                card.style.minHeight = calculatedHeight + 'px';
+            }
+        }
+        
+        // Download share card
+        // Old duplicate handlers removed - using event delegation handlers defined above
     </script>
 </body>
 </html>
-

@@ -1,5 +1,14 @@
 <?php
 session_start();
+require_once __DIR__.'/../includes/check_course_status.php';
+
+// Redirect or show coming soon if courses are disabled
+if (!isCoursesEnabled()) {
+    // Show coming soon page
+    $show_coming_soon = true;
+} else {
+    $show_coming_soon = false;
+}
 ?>
 <!DOCTYPE html>
 <html lang="en">
@@ -312,7 +321,7 @@ session_start();
                             <p class="card-text">शुरुआतीहरूका लागि शेयर बजारको मूलभूत ज्ञान, कसरी सुरु गर्ने, र बजार विश्लेषणको आधारभूत तरिकाहरू।</p>
                             <p class="course-duration"><i class="far fa-clock me-2"></i>4 हप्ता</p>
                             <p class="course-price">रु. 2,500</p>
-                            <a href="#" class="btn btn-enroll">BUY NOW</a>
+                            <button class="btn btn-enroll" onclick="openPaymentModal(1, 'शेयर बजारको बेसिक ज्ञान', 2500)">BUY NOW</button>
                         </div>
                     </div>
                 </div>
@@ -327,7 +336,7 @@ session_start();
                             <p class="card-text">चार्ट, प्याटर्न, र टेक्निकल इन्डिकेटरहरूको प्रयोग गरेर बजारको प्रवृत्ति विश्लेषण गर्ने तरिका सिक्नुहोस्।</p>
                             <p class="course-duration"><i class="far fa-clock me-2"></i>6 हप्ता</p>
                             <p class="course-price">रु. 4,500</p>
-                            <a href="#" class="btn btn-enroll">BUY NOW</a>
+                            <button class="btn btn-enroll" onclick="openPaymentModal(2, 'टेक्निकल विश्लेषण', 4500)">BUY NOW</button>
                         </div>
                     </div>
                 </div>
@@ -342,7 +351,7 @@ session_start();
                             <p class="card-text">कम्पनीहरूको वित्तीय विवरण, उद्योग विश्लेषण, र मूल्यांकन तरिकाहरूबारे गहन अध्ययन।</p>
                             <p class="course-duration"><i class="far fa-clock me-2"></i>8 हप्ता</p>
                             <p class="course-price">रु. 6,500</p>
-                            <a href="#" class="btn btn-enroll">BUY NOW</a>
+                            <button class="btn btn-enroll" onclick="openPaymentModal(3, 'फन्डामेन्टल विश्लेषण', 6500)">BUY NOW</button>
                         </div>
                     </div>
                 </div>
@@ -357,7 +366,7 @@ session_start();
                             <p class="card-text">विभिन्न ट्रेडिंग शैलीहरू, जस्तै स्विंग ट्रेडिंग, डे ट्रेडिंग, र पोजिसन ट्रेडिंगबारे व्यावहारिक ज्ञान।</p>
                             <p class="course-duration"><i class="far fa-clock me-2"></i>5 हप्ता</p>
                             <p class="course-price">रु. 3,800</p>
-                            <a href="#" class="btn btn-enroll">BUY NOW</a>
+                            <button class="btn btn-enroll" onclick="openPaymentModal(4, 'ट्रेडिंग रणनीतिहरू', 3800)">BUY NOW</button>
                         </div>
                     </div>
                 </div>
@@ -372,7 +381,7 @@ session_start();
                             <p class="card-text">जोखिम व्यवस्थापन, विविधीकरण, र दीर्घकालीन निवेश रणनीतिहरूबारे सिक्नुहोस्।</p>
                             <p class="course-duration"><i class="far fa-clock me-2"></i>7 हप्ता</p>
                             <p class="course-price">रु. 5,500</p>
-                            <a href="#" class="btn btn-enroll">BUY NOW</a>
+                            <button class="btn btn-enroll" onclick="openPaymentModal(5, 'पोर्टफोलियो व्यवस्थापन', 5500)">BUY NOW</button>
                         </div>
                     </div>
                 </div>
@@ -387,7 +396,7 @@ session_start();
                             <p class="card-text">कल र पुट अप्सनहरू, स्ट्रेटेजीहरू, र जोखिम व्यवस्थापनबारे विस्तृत ज्ञान प्राप्त गर्नुहोस्।</p>
                             <p class="course-duration"><i class="far fa-clock me-2"></i>6 हप्ता</p>
                             <p class="course-price">रु. 7,000</p>
-                            <a href="#" class="btn btn-enroll">BUY NOW</a>
+                            <button class="btn btn-enroll" onclick="openPaymentModal(6, 'अप्सन ट्रेडिंग', 7000)">BUY NOW</button>
                         </div>
                     </div>
                 </div>
@@ -424,6 +433,300 @@ session_start();
         </div>
     </footer>
 
+    <!-- Payment Modal -->
+    <div class="modal fade" id="paymentModal" tabindex="-1" aria-labelledby="paymentModalLabel" aria-hidden="true">
+        <div class="modal-dialog modal-lg">
+            <div class="modal-content" style="background-color: var(--dark-card); border: 1px solid var(--border-color);">
+                <div class="modal-header" style="background: linear-gradient(135deg, var(--primary) 0%, var(--primary-dark) 100%); border-bottom: 2px solid var(--primary-dark);">
+                    <h5 class="modal-title" id="paymentModalLabel" style="color: white; font-weight: 700;">
+                        <i class="fas fa-credit-card me-2"></i>Payment Options
+                    </h5>
+                    <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
+                </div>
+                <div class="modal-body" style="background-color: var(--dark-card); color: var(--text-primary);">
+                    <div class="alert alert-info" style="background-color: rgba(59, 130, 246, 0.2); border: 2px solid #3b82f6; color: #93c5fd;">
+                        <i class="fas fa-info-circle me-2"></i>
+                        <strong>Course:</strong> <span id="modalCourseName"></span><br>
+                        <strong>Price:</strong> रु. <span id="modalCoursePrice"></span>
+                    </div>
+                    
+                    <form id="paymentForm" action="process_payment.php" method="POST" enctype="multipart/form-data">
+                        <input type="hidden" name="course_id" id="modalCourseId">
+                        <input type="hidden" name="course_price" id="modalCoursePriceInput">
+                        
+                        <!-- Payment Method Selection -->
+                        <div class="mb-4">
+                            <label class="form-label" style="color: var(--text-primary); font-weight: 600;">
+                                <i class="fas fa-money-bill-wave me-2"></i>Select Payment Method *
+                            </label>
+                            <div class="row">
+                                <div class="col-md-6 mb-3">
+                                    <div class="payment-option-card" onclick="selectPaymentMethod('bank_transfer')" style="cursor: pointer; border: 2px solid var(--border-color); border-radius: 8px; padding: 20px; background-color: var(--dark-hover); transition: all 0.3s;">
+                                        <input type="radio" name="payment_method" value="bank_transfer" id="bank_transfer" required style="display: none;">
+                                        <div class="text-center">
+                                            <i class="fas fa-university fa-3x mb-3" style="color: var(--primary);"></i>
+                                            <h6 style="color: var(--text-primary); font-weight: 600;">Bank Transfer</h6>
+                                            <p class="text-muted" style="color: var(--text-secondary); font-size: 0.9rem;">Transfer to our bank account</p>
+                                        </div>
+                                    </div>
+                                </div>
+                                <div class="col-md-6 mb-3">
+                                    <div class="payment-option-card" onclick="selectPaymentMethod('crypto')" style="cursor: pointer; border: 2px solid var(--border-color); border-radius: 8px; padding: 20px; background-color: var(--dark-hover); transition: all 0.3s;">
+                                        <input type="radio" name="payment_method" value="crypto" id="crypto" required style="display: none;">
+                                        <div class="text-center">
+                                            <i class="fab fa-bitcoin fa-3x mb-3" style="color: var(--primary);"></i>
+                                            <h6 style="color: var(--text-primary); font-weight: 600;">Cryptocurrency</h6>
+                                            <p class="text-muted" style="color: var(--text-secondary); font-size: 0.9rem;">Pay with USDT/Crypto</p>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                        
+                        <!-- Bank Transfer Details -->
+                        <div id="bankDetails" style="display: none;">
+                            <div class="alert alert-warning" style="background-color: rgba(251, 191, 36, 0.2); border: 2px solid #fbbf24; color: #fbbf24; margin-bottom: 20px;">
+                                <i class="fas fa-exclamation-triangle me-2"></i>
+                                <strong>Bank Transfer Instructions:</strong>
+                                <ul class="mb-0 mt-2" style="color: #fbbf24;">
+                                    <li>Transfer the exact amount to the bank account shown below</li>
+                                    <li>Take a screenshot of the payment confirmation</li>
+                                    <li>Upload the screenshot as payment proof</li>
+                                </ul>
+                            </div>
+                            <div id="bankInfo" style="background-color: var(--dark-hover); padding: 20px; border-radius: 8px; border: 1px solid var(--border-color);">
+                                <!-- Bank details will be loaded via AJAX -->
+                                <div class="text-center">
+                                    <i class="fas fa-spinner fa-spin fa-2x" style="color: var(--primary);"></i>
+                                    <p class="mt-2" style="color: var(--text-secondary);">Loading bank details...</p>
+                                </div>
+                            </div>
+                        </div>
+                        
+                        <!-- Crypto Details -->
+                        <div id="cryptoDetails" style="display: none;">
+                            <div class="alert alert-warning" style="background-color: rgba(251, 191, 36, 0.2); border: 2px solid #fbbf24; color: #fbbf24; margin-bottom: 20px;">
+                                <i class="fas fa-exclamation-triangle me-2"></i>
+                                <strong>Crypto Payment Instructions:</strong>
+                                <ul class="mb-0 mt-2" style="color: #fbbf24;">
+                                    <li>Send the exact amount to the wallet address shown below</li>
+                                    <li>Make sure to use the correct network (TRC20/ERC20)</li>
+                                    <li>Take a screenshot of the transaction</li>
+                                    <li>Upload the screenshot as payment proof</li>
+                                </ul>
+                            </div>
+                            <div id="cryptoInfo" style="background-color: var(--dark-hover); padding: 20px; border-radius: 8px; border: 1px solid var(--border-color);">
+                                <!-- Crypto details will be loaded via AJAX -->
+                                <div class="text-center">
+                                    <i class="fas fa-spinner fa-spin fa-2x" style="color: var(--primary);"></i>
+                                    <p class="mt-2" style="color: var(--text-secondary);">Loading crypto details...</p>
+                                </div>
+                            </div>
+                        </div>
+                        
+                        <!-- Payment Proof Upload -->
+                        <div class="mb-3" id="proofUploadSection" style="display: none;">
+                            <label class="form-label" style="color: var(--text-primary); font-weight: 600;">
+                                <i class="fas fa-upload me-2"></i>Upload Payment Proof (Screenshot) *
+                            </label>
+                            <input type="file" class="form-control" name="payment_proof" id="payment_proof" accept="image/*" required style="background-color: var(--dark-hover); border: 2px solid var(--border-color); color: var(--text-primary);">
+                            <small class="text-muted" style="color: var(--text-secondary);">
+                                <i class="fas fa-info-circle me-1"></i>Upload a clear screenshot of your payment confirmation (JPG, PNG, max 5MB)
+                            </small>
+                            <div id="proofPreview" class="mt-3" style="display: none;">
+                                <img id="proofPreviewImg" src="" alt="Payment Proof Preview" style="max-width: 100%; max-height: 300px; border-radius: 8px; border: 2px solid var(--primary);">
+                            </div>
+                        </div>
+                        
+                        <!-- Transaction Reference (Optional) -->
+                        <div class="mb-3" id="transactionRefSection" style="display: none;">
+                            <label class="form-label" style="color: var(--text-primary); font-weight: 600;">
+                                <i class="fas fa-receipt me-2"></i>Transaction Reference/ID (Optional)
+                            </label>
+                            <input type="text" class="form-control" name="transaction_ref" id="transaction_ref" placeholder="Enter transaction ID or reference number" style="background-color: var(--dark-hover); border: 2px solid var(--border-color); color: var(--text-primary);">
+                        </div>
+                    </form>
+                </div>
+                <div class="modal-footer" style="background-color: var(--dark-card); border-top: 1px solid var(--border-color);">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal" style="background-color: var(--dark-hover); border-color: var(--border-color); color: var(--text-primary);">Cancel</button>
+                    <button type="submit" form="paymentForm" class="btn btn-primary" style="background-color: var(--primary); border-color: var(--primary);">
+                        <i class="fas fa-paper-plane me-2"></i>Submit Payment
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <?php include __DIR__.'/../includes/coming_soon_notification.php'; ?>
+    
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+    <script>
+        let selectedPaymentMethod = '';
+        
+        function openPaymentModal(courseId, courseName, coursePrice) {
+            <?php if (!isset($_SESSION['user_id'])): ?>
+                alert('Please login first to purchase courses.');
+                window.location.href = '../login.php';
+                return;
+            <?php endif; ?>
+            
+            document.getElementById('modalCourseId').value = courseId;
+            document.getElementById('modalCourseName').textContent = courseName;
+            document.getElementById('modalCoursePrice').textContent = coursePrice.toLocaleString();
+            document.getElementById('modalCoursePriceInput').value = coursePrice;
+            
+            // Reset form
+            document.getElementById('paymentForm').reset();
+            document.getElementById('bankDetails').style.display = 'none';
+            document.getElementById('cryptoDetails').style.display = 'none';
+            document.getElementById('proofUploadSection').style.display = 'none';
+            document.getElementById('transactionRefSection').style.display = 'none';
+            document.getElementById('proofPreview').style.display = 'none';
+            selectedPaymentMethod = '';
+            
+            // Remove selected class from payment options
+            document.querySelectorAll('.payment-option-card').forEach(card => {
+                card.style.borderColor = 'var(--border-color)';
+                card.style.backgroundColor = 'var(--dark-hover)';
+            });
+            
+            const modal = new bootstrap.Modal(document.getElementById('paymentModal'));
+            modal.show();
+        }
+        
+        function selectPaymentMethod(method) {
+            selectedPaymentMethod = method;
+            
+            // Update radio button
+            document.getElementById(method).checked = true;
+            
+            // Update visual selection
+            document.querySelectorAll('.payment-option-card').forEach(card => {
+                card.style.borderColor = 'var(--border-color)';
+                card.style.backgroundColor = 'var(--dark-hover)';
+            });
+            
+            event.currentTarget.style.borderColor = 'var(--primary)';
+            event.currentTarget.style.backgroundColor = 'rgba(16, 185, 129, 0.2)';
+            
+            // Show/hide details
+            if (method === 'bank_transfer') {
+                document.getElementById('bankDetails').style.display = 'block';
+                document.getElementById('cryptoDetails').style.display = 'none';
+                loadBankDetails();
+            } else if (method === 'crypto') {
+                document.getElementById('cryptoDetails').style.display = 'block';
+                document.getElementById('bankDetails').style.display = 'none';
+                loadCryptoDetails();
+            }
+            
+            // Show payment proof upload
+            document.getElementById('proofUploadSection').style.display = 'block';
+            document.getElementById('transactionRefSection').style.display = 'block';
+        }
+        
+        function loadBankDetails() {
+            fetch('get_payment_details.php?type=bank_transfer')
+                .then(response => response.json())
+                .then(data => {
+                    if (data.success) {
+                        const bankInfo = `
+                            <div class="row">
+                                <div class="col-md-6 mb-3">
+                                    <strong style="color: var(--primary);"><i class="fas fa-university me-2"></i>Bank Name:</strong>
+                                    <p style="color: var(--text-primary);">${data.bank_name || 'N/A'}</p>
+                                </div>
+                                <div class="col-md-6 mb-3">
+                                    <strong style="color: var(--primary);"><i class="fas fa-user me-2"></i>Account Name:</strong>
+                                    <p style="color: var(--text-primary);">${data.account_name || 'N/A'}</p>
+                                </div>
+                                <div class="col-md-6 mb-3">
+                                    <strong style="color: var(--primary);"><i class="fas fa-hashtag me-2"></i>Account Number:</strong>
+                                    <p style="color: var(--text-primary); font-family: monospace; font-size: 1.1rem;">${data.account_number || 'N/A'}</p>
+                                </div>
+                                <div class="col-md-6 mb-3">
+                                    <strong style="color: var(--primary);"><i class="fas fa-info-circle me-2"></i>Account Type:</strong>
+                                    <p style="color: var(--text-primary);">${data.account_type || 'N/A'}</p>
+                                </div>
+                                ${data.qr_code ? `
+                                <div class="col-12 text-center mb-3">
+                                    <strong style="color: var(--primary); display: block; margin-bottom: 10px;">QR Code:</strong>
+                                    <img src="../${data.qr_code}" alt="Bank QR Code" style="max-width: 250px; border-radius: 8px; border: 2px solid var(--primary);">
+                                </div>
+                                ` : ''}
+                            </div>
+                        `;
+                        document.getElementById('bankInfo').innerHTML = bankInfo;
+                    }
+                })
+                .catch(error => {
+                    console.error('Error loading bank details:', error);
+                    document.getElementById('bankInfo').innerHTML = '<p style="color: var(--text-danger);">Error loading bank details. Please try again.</p>';
+                });
+        }
+        
+        function loadCryptoDetails() {
+            fetch('get_payment_details.php?type=crypto')
+                .then(response => response.json())
+                .then(data => {
+                    if (data.success) {
+                        const cryptoInfo = `
+                            <div class="row">
+                                <div class="col-md-6 mb-3">
+                                    <strong style="color: var(--primary);"><i class="fab fa-bitcoin me-2"></i>Crypto Type:</strong>
+                                    <p style="color: var(--text-primary);">${data.crypto_type || 'USDT'}</p>
+                                </div>
+                                <div class="col-md-6 mb-3">
+                                    <strong style="color: var(--primary);"><i class="fas fa-network-wired me-2"></i>Network:</strong>
+                                    <p style="color: var(--text-primary);">${data.network || 'TRC20'}</p>
+                                </div>
+                                <div class="col-12 mb-3">
+                                    <strong style="color: var(--primary);"><i class="fas fa-wallet me-2"></i>Wallet Address:</strong>
+                                    <div class="input-group mt-2">
+                                        <input type="text" class="form-control" value="${data.wallet_address || 'N/A'}" id="cryptoAddress" readonly style="background-color: var(--dark-card); border: 2px solid var(--primary); color: var(--text-primary); font-family: monospace;">
+                                        <button class="btn btn-primary" type="button" onclick="copyCryptoAddress()" style="background-color: var(--primary); border-color: var(--primary);">
+                                            <i class="fas fa-copy"></i> Copy
+                                        </button>
+                                    </div>
+                                </div>
+                                ${data.qr_code ? `
+                                <div class="col-12 text-center mb-3">
+                                    <strong style="color: var(--primary); display: block; margin-bottom: 10px;">QR Code:</strong>
+                                    <img src="../${data.qr_code}" alt="Crypto QR Code" style="max-width: 250px; border-radius: 8px; border: 2px solid var(--primary);">
+                                </div>
+                                ` : ''}
+                            </div>
+                        `;
+                        document.getElementById('cryptoInfo').innerHTML = cryptoInfo;
+                    }
+                })
+                .catch(error => {
+                    console.error('Error loading crypto details:', error);
+                    document.getElementById('cryptoInfo').innerHTML = '<p style="color: var(--text-danger);">Error loading crypto details. Please try again.</p>';
+                });
+        }
+        
+        function copyCryptoAddress() {
+            const addressInput = document.getElementById('cryptoAddress');
+            addressInput.select();
+            document.execCommand('copy');
+            alert('Wallet address copied to clipboard!');
+        }
+        
+        // Preview payment proof image
+        document.getElementById('payment_proof').addEventListener('change', function(e) {
+            const file = e.target.files[0];
+            if (file) {
+                const reader = new FileReader();
+                reader.onload = function(e) {
+                    document.getElementById('proofPreviewImg').src = e.target.result;
+                    document.getElementById('proofPreview').style.display = 'block';
+                };
+                reader.readAsDataURL(file);
+            }
+        });
+    </script>
+    
+    <?php include __DIR__.'/../includes/coming_soon_notification.php'; ?>
 </body>
 </html>
