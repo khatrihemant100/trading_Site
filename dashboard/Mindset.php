@@ -11,6 +11,146 @@ $stmt = $pdo->prepare("SELECT * FROM users WHERE id = ?");
 $stmt->execute([$_SESSION['user_id']]);
 $user = $stmt->fetch(PDO::FETCH_ASSOC);
 
+$user_id = $_SESSION['user_id'];
+$message = '';
+$message_type = '';
+
+// Handle form submissions
+if ($_SERVER['REQUEST_METHOD'] === 'POST') {
+    if (isset($_POST['action'])) {
+        try {
+            if ($_POST['action'] === 'save_routine') {
+                $routine_date = $_POST['routine_date'] ?? date('Y-m-d');
+                $pre_market = isset($_POST['pre_market']) ? 1 : 0;
+                $trading_session = isset($_POST['trading_session']) ? 1 : 0;
+                $post_market = isset($_POST['post_market']) ? 1 : 0;
+                $evening = isset($_POST['evening']) ? 1 : 0;
+                
+                $stmt = $pdo->prepare("
+                    INSERT INTO daily_routines (user_id, routine_date, pre_market, trading_session, post_market, evening)
+                    VALUES (?, ?, ?, ?, ?, ?)
+                    ON DUPLICATE KEY UPDATE 
+                        pre_market = VALUES(pre_market),
+                        trading_session = VALUES(trading_session),
+                        post_market = VALUES(post_market),
+                        evening = VALUES(evening),
+                        updated_at = NOW()
+                ");
+                $stmt->execute([$user_id, $routine_date, $pre_market, $trading_session, $post_market, $evening]);
+                $message = "Daily routine saved successfully!";
+                $message_type = 'success';
+            } elseif ($_POST['action'] === 'add_psychology_log') {
+                $log_date = $_POST['log_date'] ?? date('Y-m-d');
+                $emotion_before = $_POST['emotion_before'] ?? null;
+                $emotion_during = $_POST['emotion_during'] ?? null;
+                $emotion_after = $_POST['emotion_after'] ?? null;
+                $confidence_level = intval($_POST['confidence_level'] ?? 5);
+                $stress_level = intval($_POST['stress_level'] ?? 5);
+                $notes = $_POST['notes'] ?? null;
+                
+                $stmt = $pdo->prepare("
+                    INSERT INTO psychology_logs (user_id, log_date, emotion_before, emotion_during, emotion_after, confidence_level, stress_level, notes)
+                    VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+                ");
+                $stmt->execute([$user_id, $log_date, $emotion_before, $emotion_during, $emotion_after, $confidence_level, $stress_level, $notes]);
+                $message = "Psychology log added successfully!";
+                $message_type = 'success';
+            } elseif ($_POST['action'] === 'complete_exercise') {
+                $exercise_name = $_POST['exercise_name'] ?? '';
+                $module_name = $_POST['module_name'] ?? '';
+                $completion_date = $_POST['completion_date'] ?? date('Y-m-d');
+                $notes = $_POST['exercise_notes'] ?? null;
+                
+                $stmt = $pdo->prepare("
+                    INSERT INTO exercise_completions (user_id, exercise_name, module_name, completion_date, notes)
+                    VALUES (?, ?, ?, ?, ?)
+                ");
+                $stmt->execute([$user_id, $exercise_name, $module_name, $completion_date, $notes]);
+                $message = "Exercise marked as complete!";
+                $message_type = 'success';
+            }
+        } catch (PDOException $e) {
+            $message = "Error: " . $e->getMessage();
+            $message_type = 'danger';
+        }
+    }
+}
+
+// Get today's routine
+$today = date('Y-m-d');
+$routine_stmt = $pdo->prepare("SELECT * FROM daily_routines WHERE user_id = ? AND routine_date = ?");
+$routine_stmt->execute([$user_id, $today]);
+$today_routine = $routine_stmt->fetch(PDO::FETCH_ASSOC);
+
+// Calculate progress scores
+// Emotional Control: Based on confidence/stress levels and emotion logs
+$emotion_stmt = $pdo->prepare("
+    SELECT AVG(confidence_level) as avg_confidence, AVG(stress_level) as avg_stress, COUNT(*) as log_count
+    FROM psychology_logs 
+    WHERE user_id = ? AND log_date >= DATE_SUB(CURDATE(), INTERVAL 30 DAY)
+");
+$emotion_stmt->execute([$user_id]);
+$emotion_data = $emotion_stmt->fetch(PDO::FETCH_ASSOC);
+$emotional_control_score = 0;
+if ($emotion_data && $emotion_data['log_count'] > 0) {
+    $avg_conf = $emotion_data['avg_confidence'] ?? 5;
+    $avg_stress = $emotion_data['avg_stress'] ?? 5;
+    // Higher confidence and lower stress = better emotional control
+    $confidence_score = ($avg_conf / 10) * 60;
+    $stress_score = ((10 - $avg_stress) / 10) * 40;
+    $emotional_control_score = min(100, max(0, $confidence_score + $stress_score));
+}
+
+// Discipline: Based on routine completion
+$routine_stmt = $pdo->prepare("
+    SELECT 
+        SUM(pre_market + trading_session + post_market + evening) as total_completed,
+        COUNT(*) * 4 as total_possible
+    FROM daily_routines 
+    WHERE user_id = ? AND routine_date >= DATE_SUB(CURDATE(), INTERVAL 30 DAY)
+");
+$routine_stmt->execute([$user_id]);
+$routine_data = $routine_stmt->fetch(PDO::FETCH_ASSOC);
+$discipline_score = 0;
+if ($routine_data && $routine_data['total_possible'] > 0) {
+    $discipline_score = min(100, ($routine_data['total_completed'] / $routine_data['total_possible']) * 100);
+}
+
+// Risk Management: Based on exercise completions and journal entries
+$risk_stmt = $pdo->prepare("
+    SELECT COUNT(*) as exercise_count
+    FROM exercise_completions 
+    WHERE user_id = ? AND module_name = 'Risk Management Mindset' AND completion_date >= DATE_SUB(CURDATE(), INTERVAL 30 DAY)
+");
+$risk_stmt->execute([$user_id]);
+$risk_data = $risk_stmt->fetch(PDO::FETCH_ASSOC);
+$risk_management_score = min(100, ($risk_data['exercise_count'] ?? 0) * 20);
+
+// Get recent psychology logs
+$recent_logs_stmt = $pdo->prepare("
+    SELECT * FROM psychology_logs 
+    WHERE user_id = ? 
+    ORDER BY log_date DESC, created_at DESC 
+    LIMIT 10
+");
+$recent_logs_stmt->execute([$user_id]);
+$recent_logs = $recent_logs_stmt->fetchAll(PDO::FETCH_ASSOC);
+
+// Get exercise completions
+$exercise_stmt = $pdo->prepare("
+    SELECT exercise_name, module_name, completion_date 
+    FROM exercise_completions 
+    WHERE user_id = ? 
+    ORDER BY completion_date DESC
+");
+$exercise_stmt->execute([$user_id]);
+$completed_exercises = $exercise_stmt->fetchAll(PDO::FETCH_ASSOC);
+$completed_exercise_map = [];
+foreach ($completed_exercises as $ex) {
+    $key = $ex['module_name'] . '|' . $ex['exercise_name'];
+    $completed_exercise_map[$key] = true;
+}
+
 // Psychology exercises and content
 $psychology_modules = [
     [
@@ -655,59 +795,113 @@ $daily_routines = [
     <main class="main-content">
         <div class="container-fluid py-4">
             <!-- Header -->
-            <div class="mb-4">
-                <h1 class="h2">Trader Psychology Development</h1>
-                <p class="text-muted">Build the mindset of successful traders</p>
+            <div class="mb-4 d-flex justify-content-between align-items-center">
+                <div>
+                    <h1 class="h2">Trader Psychology Development</h1>
+                    <p class="text-muted">Build the mindset of successful traders</p>
+                </div>
+                <button class="btn btn-primary" data-bs-toggle="modal" data-bs-target="#addPsychologyModal">
+                    <i class="fas fa-plus me-2"></i>Add Psychology Log
+                </button>
             </div>
+            
+            <?php if ($message): ?>
+                <div class="alert alert-<?php echo $message_type; ?> alert-dismissible fade show">
+                    <?php echo htmlspecialchars($message); ?>
+                    <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+                </div>
+            <?php endif; ?>
 
             <!-- Psychology Assessment -->
             <div class="row mb-4">
                 <div class="col-md-4">
                     <div class="psychology-card text-center">
-                        <div class="progress-ring mb-3 mx-auto">
+                        <div class="progress-ring mb-3 mx-auto position-relative" style="width: 80px; height: 80px;">
                             <svg width="80" height="80">
                                 <circle cx="40" cy="40" r="35" stroke="#334155" stroke-width="8" fill="none"/>
+                                <?php 
+                                $emotion_percent = round($emotional_control_score);
+                                $circumference = 2 * M_PI * 35;
+                                $offset = $circumference - ($emotion_percent / 100) * $circumference;
+                                ?>
                                 <circle cx="40" cy="40" r="35" stroke="#10b981" stroke-width="8" fill="none" 
-                                        stroke-dasharray="220" stroke-dashoffset="66" stroke-linecap="round"/>
+                                        stroke-dasharray="<?php echo $circumference; ?>" 
+                                        stroke-dashoffset="<?php echo $offset; ?>" 
+                                        stroke-linecap="round" transform="rotate(-90 40 40)"/>
                             </svg>
-                            <div class="position-absolute top-50 start-50 translate-middle">
-                                <h4 class="mb-0">70%</h4>
+                            <div class="position-absolute top-50 start-50 translate-middle" style="transform: translate(-50%, -50%);">
+                                <h4 class="mb-0"><?php echo $emotion_percent; ?>%</h4>
                             </div>
                         </div>
                         <h6>Emotional Control</h6>
-                        <small class="text-muted">Current Level</small>
+                        <small class="text-muted">
+                            <?php 
+                            if ($emotion_percent >= 80) echo "Excellent";
+                            elseif ($emotion_percent >= 60) echo "Good Progress";
+                            elseif ($emotion_percent >= 40) echo "Needs Improvement";
+                            else echo "Start Tracking";
+                            ?>
+                        </small>
                     </div>
                 </div>
                 <div class="col-md-4">
                     <div class="psychology-card text-center">
-                        <div class="progress-ring mb-3 mx-auto">
+                        <div class="progress-ring mb-3 mx-auto position-relative" style="width: 80px; height: 80px;">
                             <svg width="80" height="80">
                                 <circle cx="40" cy="40" r="35" stroke="#334155" stroke-width="8" fill="none"/>
+                                <?php 
+                                $discipline_percent = round($discipline_score);
+                                $circumference = 2 * M_PI * 35;
+                                $offset = $circumference - ($discipline_percent / 100) * $circumference;
+                                ?>
                                 <circle cx="40" cy="40" r="35" stroke="#10b981" stroke-width="8" fill="none" 
-                                        stroke-dasharray="220" stroke-dashoffset="110" stroke-linecap="round"/>
+                                        stroke-dasharray="<?php echo $circumference; ?>" 
+                                        stroke-dashoffset="<?php echo $offset; ?>" 
+                                        stroke-linecap="round" transform="rotate(-90 40 40)"/>
                             </svg>
-                            <div class="position-absolute top-50 start-50 translate-middle">
-                                <h4 class="mb-0">50%</h4>
+                            <div class="position-absolute top-50 start-50 translate-middle" style="transform: translate(-50%, -50%);">
+                                <h4 class="mb-0"><?php echo $discipline_percent; ?>%</h4>
                             </div>
                         </div>
                         <h6>Discipline Score</h6>
-                        <small class="text-muted">Needs Improvement</small>
+                        <small class="text-muted">
+                            <?php 
+                            if ($discipline_percent >= 80) echo "Excellent";
+                            elseif ($discipline_percent >= 60) echo "Good Progress";
+                            elseif ($discipline_percent >= 40) echo "Needs Improvement";
+                            else echo "Start Tracking";
+                            ?>
+                        </small>
                     </div>
                 </div>
                 <div class="col-md-4">
                     <div class="psychology-card text-center">
-                        <div class="progress-ring mb-3 mx-auto">
+                        <div class="progress-ring mb-3 mx-auto position-relative" style="width: 80px; height: 80px;">
                             <svg width="80" height="80">
                                 <circle cx="40" cy="40" r="35" stroke="#334155" stroke-width="8" fill="none"/>
+                                <?php 
+                                $risk_percent = round($risk_management_score);
+                                $circumference = 2 * M_PI * 35;
+                                $offset = $circumference - ($risk_percent / 100) * $circumference;
+                                ?>
                                 <circle cx="40" cy="40" r="35" stroke="#10b981" stroke-width="8" fill="none" 
-                                        stroke-dasharray="220" stroke-dashoffset="44" stroke-linecap="round"/>
+                                        stroke-dasharray="<?php echo $circumference; ?>" 
+                                        stroke-dashoffset="<?php echo $offset; ?>" 
+                                        stroke-linecap="round" transform="rotate(-90 40 40)"/>
                             </svg>
-                            <div class="position-absolute top-50 start-50 translate-middle">
-                                <h4 class="mb-0">80%</h4>
+                            <div class="position-absolute top-50 start-50 translate-middle" style="transform: translate(-50%, -50%);">
+                                <h4 class="mb-0"><?php echo $risk_percent; ?>%</h4>
                             </div>
                         </div>
                         <h6>Risk Management</h6>
-                        <small class="text-muted">Good Progress</small>
+                        <small class="text-muted">
+                            <?php 
+                            if ($risk_percent >= 80) echo "Excellent";
+                            elseif ($risk_percent >= 60) echo "Good Progress";
+                            elseif ($risk_percent >= 40) echo "Needs Improvement";
+                            else echo "Start Tracking";
+                            ?>
+                        </small>
                     </div>
                 </div>
             </div>
@@ -729,14 +923,25 @@ $daily_routines = [
                             
                             <h6 class="mb-2">Daily Exercises:</h6>
                             <?php foreach ($module['exercises'] as $exercise): ?>
-                                <div class="exercise-item">
-                                    <i class="fas fa-check-circle text-success me-2"></i>
-                                    <?php echo $exercise; ?>
+                                <?php 
+                                $exercise_key = $module['title'] . '|' . $exercise;
+                                $is_completed = isset($completed_exercise_map[$exercise_key]);
+                                ?>
+                                <div class="exercise-item d-flex justify-content-between align-items-center">
+                                    <div>
+                                        <i class="fas <?php echo $is_completed ? 'fa-check-circle text-success' : 'fa-circle'; ?> me-2"></i>
+                                        <?php echo $exercise; ?>
+                                    </div>
+                                    <?php if (!$is_completed): ?>
+                                        <button class="btn btn-sm btn-outline-success" onclick="completeExercise('<?php echo htmlspecialchars($module['title']); ?>', '<?php echo htmlspecialchars($exercise); ?>')">
+                                            <i class="fas fa-check"></i>
+                                        </button>
+                                    <?php endif; ?>
                                 </div>
                             <?php endforeach; ?>
                             
-                            <button class="btn btn-primary btn-sm w-100 mt-3">
-                                <i class="fas fa-play me-2"></i>Start Training
+                            <button class="btn btn-primary btn-sm w-100 mt-3" onclick="viewModuleDetails('<?php echo htmlspecialchars($module['title']); ?>')">
+                                <i class="fas fa-play me-2"></i>View Details
                             </button>
                         </div>
                     </div>
@@ -745,25 +950,98 @@ $daily_routines = [
 
             <!-- Daily Routine Tracker -->
             <div class="psychology-card mt-4">
-                <h5 class="mb-3">Daily Trader Routine</h5>
-                <div class="row">
-                    <?php foreach ($daily_routines as $index => $routine): ?>
+                <h5 class="mb-3">Daily Trader Routine - <?php echo date('F d, Y'); ?></h5>
+                <form method="POST" id="routineForm">
+                    <input type="hidden" name="action" value="save_routine">
+                    <input type="hidden" name="routine_date" value="<?php echo $today; ?>">
+                    <div class="row">
                         <div class="col-md-6 mb-3">
                             <div class="form-check">
-                                <input class="form-check-input" type="checkbox" id="routine<?php echo $index; ?>">
-                                <label class="form-check-label" for="routine<?php echo $index; ?>">
-                                    <?php echo $routine; ?>
+                                <input class="form-check-input" type="checkbox" name="pre_market" id="pre_market" 
+                                       <?php echo ($today_routine && $today_routine['pre_market']) ? 'checked' : ''; ?>>
+                                <label class="form-check-label" for="pre_market">
+                                    Pre-Market: 10-min meditation + plan review
                                 </label>
                             </div>
                         </div>
-                    <?php endforeach; ?>
-                </div>
-                <div class="mt-3">
-                    <button class="btn btn-success">
-                        <i class="fas fa-save me-2"></i>Save Progress
-                    </button>
+                        <div class="col-md-6 mb-3">
+                            <div class="form-check">
+                                <input class="form-check-input" type="checkbox" name="trading_session" id="trading_session"
+                                       <?php echo ($today_routine && $today_routine['trading_session']) ? 'checked' : ''; ?>>
+                                <label class="form-check-label" for="trading_session">
+                                    Trading Session: Follow trading plan strictly
+                                </label>
+                            </div>
+                        </div>
+                        <div class="col-md-6 mb-3">
+                            <div class="form-check">
+                                <input class="form-check-input" type="checkbox" name="post_market" id="post_market"
+                                       <?php echo ($today_routine && $today_routine['post_market']) ? 'checked' : ''; ?>>
+                                <label class="form-check-label" for="post_market">
+                                    Post-Market: Journaling + performance review
+                                </label>
+                            </div>
+                        </div>
+                        <div class="col-md-6 mb-3">
+                            <div class="form-check">
+                                <input class="form-check-input" type="checkbox" name="evening" id="evening"
+                                       <?php echo ($today_routine && $today_routine['evening']) ? 'checked' : ''; ?>>
+                                <label class="form-check-label" for="evening">
+                                    Evening: Learning + next day preparation
+                                </label>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="mt-3">
+                        <button type="submit" class="btn btn-success">
+                            <i class="fas fa-save me-2"></i>Save Progress
+                        </button>
+                    </div>
+                </form>
+            </div>
+            
+            <!-- Recent Psychology Logs -->
+            <?php if (!empty($recent_logs)): ?>
+            <div class="psychology-card mt-4">
+                <h5 class="mb-3">Recent Psychology Logs</h5>
+                <div class="table-responsive">
+                    <table class="table table-dark">
+                        <thead>
+                            <tr>
+                                <th>Date</th>
+                                <th>Emotion Before</th>
+                                <th>Emotion During</th>
+                                <th>Emotion After</th>
+                                <th>Confidence</th>
+                                <th>Stress</th>
+                                <th>Notes</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <?php foreach ($recent_logs as $log): ?>
+                            <tr>
+                                <td><?php echo date('M d, Y', strtotime($log['log_date'])); ?></td>
+                                <td><?php echo htmlspecialchars($log['emotion_before'] ?? 'N/A'); ?></td>
+                                <td><?php echo htmlspecialchars($log['emotion_during'] ?? 'N/A'); ?></td>
+                                <td><?php echo htmlspecialchars($log['emotion_after'] ?? 'N/A'); ?></td>
+                                <td>
+                                    <span class="badge bg-<?php echo $log['confidence_level'] >= 7 ? 'success' : ($log['confidence_level'] >= 4 ? 'warning' : 'danger'); ?>">
+                                        <?php echo $log['confidence_level']; ?>/10
+                                    </span>
+                                </td>
+                                <td>
+                                    <span class="badge bg-<?php echo $log['stress_level'] <= 3 ? 'success' : ($log['stress_level'] <= 6 ? 'warning' : 'danger'); ?>">
+                                        <?php echo $log['stress_level']; ?>/10
+                                    </span>
+                                </td>
+                                <td><?php echo htmlspecialchars(substr($log['notes'] ?? '', 0, 50)); ?><?php echo strlen($log['notes'] ?? '') > 50 ? '...' : ''; ?></td>
+                            </tr>
+                            <?php endforeach; ?>
+                        </tbody>
+                    </table>
                 </div>
             </div>
+            <?php endif; ?>
 
             <!-- Psychology Tips -->
             <div class="psychology-card mt-4">
@@ -795,11 +1073,186 @@ $daily_routines = [
                     </div>
                 </div>
             </div>
+            
+            <!-- Recent Psychology Logs -->
+            <?php if (!empty($recent_logs)): ?>
+            <div class="psychology-card mt-4">
+                <h5 class="mb-3">Recent Psychology Logs</h5>
+                <div class="table-responsive">
+                    <table class="table table-dark">
+                        <thead>
+                            <tr>
+                                <th>Date</th>
+                                <th>Emotion Before</th>
+                                <th>Emotion During</th>
+                                <th>Emotion After</th>
+                                <th>Confidence</th>
+                                <th>Stress</th>
+                                <th>Notes</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <?php foreach ($recent_logs as $log): ?>
+                            <tr>
+                                <td><?php echo date('M d, Y', strtotime($log['log_date'])); ?></td>
+                                <td><?php echo htmlspecialchars($log['emotion_before'] ?? 'N/A'); ?></td>
+                                <td><?php echo htmlspecialchars($log['emotion_during'] ?? 'N/A'); ?></td>
+                                <td><?php echo htmlspecialchars($log['emotion_after'] ?? 'N/A'); ?></td>
+                                <td>
+                                    <span class="badge bg-<?php echo $log['confidence_level'] >= 7 ? 'success' : ($log['confidence_level'] >= 4 ? 'warning' : 'danger'); ?>">
+                                        <?php echo $log['confidence_level']; ?>/10
+                                    </span>
+                                </td>
+                                <td>
+                                    <span class="badge bg-<?php echo $log['stress_level'] <= 3 ? 'success' : ($log['stress_level'] <= 6 ? 'warning' : 'danger'); ?>">
+                                        <?php echo $log['stress_level']; ?>/10
+                                    </span>
+                                </td>
+                                <td><?php echo htmlspecialchars(substr($log['notes'] ?? '', 0, 50)); ?><?php echo strlen($log['notes'] ?? '') > 50 ? '...' : ''; ?></td>
+                            </tr>
+                            <?php endforeach; ?>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+            <?php endif; ?>
         </div>
     </main>
 
+    <!-- Add Psychology Log Modal -->
+    <div class="modal fade" id="addPsychologyModal" tabindex="-1">
+        <div class="modal-dialog modal-lg">
+            <div class="modal-content" style="background-color: var(--dark-card); border: 1px solid var(--border-color);">
+                <div class="modal-header" style="background: linear-gradient(135deg, var(--primary) 0%, var(--primary-dark) 100%); border-bottom: 2px solid var(--primary-dark);">
+                    <h5 class="modal-title" style="color: white; font-weight: 700;">
+                        <i class="fas fa-brain me-2"></i>Add Psychology Log
+                    </h5>
+                    <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+                </div>
+                <div class="modal-body" style="background-color: var(--dark-card); color: var(--text-primary);">
+                    <form method="POST" id="psychologyForm">
+                        <input type="hidden" name="action" value="add_psychology_log">
+                        <div class="mb-3">
+                            <label class="form-label" style="color: var(--text-primary);">Date</label>
+                            <input type="date" class="form-control" name="log_date" value="<?php echo date('Y-m-d'); ?>" required style="background-color: var(--dark-hover); border: 2px solid var(--border-color); color: var(--text-primary);">
+                        </div>
+                        <div class="row">
+                            <div class="col-md-4 mb-3">
+                                <label class="form-label" style="color: var(--text-primary);">Emotion Before Trading</label>
+                                <select class="form-select" name="emotion_before" style="background-color: var(--dark-hover); border: 2px solid var(--border-color); color: var(--text-primary);">
+                                    <option value="">Select...</option>
+                                    <option value="Confident">Confident</option>
+                                    <option value="Anxious">Anxious</option>
+                                    <option value="Calm">Calm</option>
+                                    <option value="Excited">Excited</option>
+                                    <option value="Fearful">Fearful</option>
+                                    <option value="Greedy">Greedy</option>
+                                    <option value="Neutral">Neutral</option>
+                                </select>
+                            </div>
+                            <div class="col-md-4 mb-3">
+                                <label class="form-label" style="color: var(--text-primary);">Emotion During Trading</label>
+                                <select class="form-select" name="emotion_during" style="background-color: var(--dark-hover); border: 2px solid var(--border-color); color: var(--text-primary);">
+                                    <option value="">Select...</option>
+                                    <option value="Confident">Confident</option>
+                                    <option value="Anxious">Anxious</option>
+                                    <option value="Calm">Calm</option>
+                                    <option value="Excited">Excited</option>
+                                    <option value="Fearful">Fearful</option>
+                                    <option value="Greedy">Greedy</option>
+                                    <option value="Neutral">Neutral</option>
+                                </select>
+                            </div>
+                            <div class="col-md-4 mb-3">
+                                <label class="form-label" style="color: var(--text-primary);">Emotion After Trading</label>
+                                <select class="form-select" name="emotion_after" style="background-color: var(--dark-hover); border: 2px solid var(--border-color); color: var(--text-primary);">
+                                    <option value="">Select...</option>
+                                    <option value="Satisfied">Satisfied</option>
+                                    <option value="Frustrated">Frustrated</option>
+                                    <option value="Calm">Calm</option>
+                                    <option value="Regretful">Regretful</option>
+                                    <option value="Proud">Proud</option>
+                                    <option value="Neutral">Neutral</option>
+                                </select>
+                            </div>
+                        </div>
+                        <div class="row">
+                            <div class="col-md-6 mb-3">
+                                <label class="form-label" style="color: var(--text-primary);">Confidence Level (1-10)</label>
+                                <input type="range" class="form-range" name="confidence_level" min="1" max="10" value="5" oninput="document.getElementById('confValue').textContent = this.value">
+                                <div class="text-center">
+                                    <span class="badge bg-primary" id="confValue">5</span>/10
+                                </div>
+                            </div>
+                            <div class="col-md-6 mb-3">
+                                <label class="form-label" style="color: var(--text-primary);">Stress Level (1-10)</label>
+                                <input type="range" class="form-range" name="stress_level" min="1" max="10" value="5" oninput="document.getElementById('stressValue').textContent = this.value">
+                                <div class="text-center">
+                                    <span class="badge bg-danger" id="stressValue">5</span>/10
+                                </div>
+                            </div>
+                        </div>
+                        <div class="mb-3">
+                            <label class="form-label" style="color: var(--text-primary);">Notes</label>
+                            <textarea class="form-control" name="notes" rows="3" placeholder="Additional notes about your psychology state..." style="background-color: var(--dark-hover); border: 2px solid var(--border-color); color: var(--text-primary);"></textarea>
+                        </div>
+                    </form>
+                </div>
+                <div class="modal-footer" style="background-color: var(--dark-card); border-top: 1px solid var(--border-color);">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                    <button type="submit" form="psychologyForm" class="btn btn-primary">
+                        <i class="fas fa-save me-2"></i>Save Log
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <!-- Complete Exercise Modal -->
+    <div class="modal fade" id="completeExerciseModal" tabindex="-1">
+        <div class="modal-dialog">
+            <div class="modal-content" style="background-color: var(--dark-card); border: 1px solid var(--border-color);">
+                <div class="modal-header" style="background: linear-gradient(135deg, var(--primary) 0%, var(--primary-dark) 100%);">
+                    <h5 class="modal-title" style="color: white;">Complete Exercise</h5>
+                    <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+                </div>
+                <div class="modal-body" style="background-color: var(--dark-card); color: var(--text-primary);">
+                    <form method="POST" id="exerciseForm">
+                        <input type="hidden" name="action" value="complete_exercise">
+                        <input type="hidden" name="module_name" id="exercise_module">
+                        <input type="hidden" name="exercise_name" id="exercise_name">
+                        <input type="hidden" name="completion_date" value="<?php echo date('Y-m-d'); ?>">
+                        <p>Mark <strong id="exercise_display"></strong> as completed?</p>
+                        <div class="mb-3">
+                            <label class="form-label" style="color: var(--text-primary);">Notes (Optional)</label>
+                            <textarea class="form-control" name="exercise_notes" rows="2" style="background-color: var(--dark-hover); border: 2px solid var(--border-color); color: var(--text-primary);"></textarea>
+                        </div>
+                    </form>
+                </div>
+                <div class="modal-footer" style="background-color: var(--dark-card);">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                    <button type="submit" form="exerciseForm" class="btn btn-success">
+                        <i class="fas fa-check me-2"></i>Mark Complete
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
     <script>
+        function completeExercise(moduleName, exerciseName) {
+            document.getElementById('exercise_module').value = moduleName;
+            document.getElementById('exercise_name').value = exerciseName;
+            document.getElementById('exercise_display').textContent = exerciseName;
+            const modal = new bootstrap.Modal(document.getElementById('completeExerciseModal'));
+            modal.show();
+        }
+        
+        function viewModuleDetails(moduleName) {
+            alert('Module details for ' + moduleName + ' coming soon!');
+        }
+        
         // Toggle calculator dropdown
         function toggleCalculatorDropdown(event) {
             if (event) {

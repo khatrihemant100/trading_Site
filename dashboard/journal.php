@@ -133,7 +133,33 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action']) && $_POST['
         $target_amount = !empty($_POST['target_amount']) ? floatval($_POST['target_amount']) : null;
         $currency = $_POST['currency'] ?? 'USD';
         $leverage = trim($_POST['leverage'] ?? '');
-        $status = $_POST['status'] ?? 'active';
+        
+        // Get current status from database first, then use POST value if provided
+        $current_account_stmt = $pdo->prepare("SELECT status FROM trading_accounts WHERE id = ? AND user_id = ?");
+        $current_account_stmt->execute([$account_id, $_SESSION['user_id']]);
+        $current_account = $current_account_stmt->fetch(PDO::FETCH_ASSOC);
+        $current_status = $current_account['status'] ?? null;
+        
+        // Use POST status if provided, otherwise keep current status, otherwise default based on account type
+        // Valid status values: active, inactive, closed, ongoing, breach, loss
+        $valid_statuses = ['active', 'inactive', 'closed', 'ongoing', 'breach', 'loss'];
+        
+        if (isset($_POST['status']) && !empty(trim($_POST['status']))) {
+            $posted_status = trim($_POST['status']);
+            // Validate status is in allowed list
+            if (in_array(strtolower($posted_status), $valid_statuses)) {
+                $status = strtolower($posted_status);
+            } else {
+                // Invalid status provided, keep current or default
+                $status = !empty($current_status) ? $current_status : ($account_type === 'propfirm' ? 'ongoing' : 'active');
+            }
+        } elseif (!empty($current_status)) {
+            $status = $current_status; // Preserve existing status if not changed
+        } else {
+            // Only default if status was never set
+            $status = ($account_type === 'propfirm' ? 'ongoing' : 'active');
+        }
+        
         $notes = trim($_POST['notes'] ?? '');
         
         // Handle challenge_fee for prop firms
@@ -196,8 +222,20 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action']) && $_POST['
                 $leverage, $status, $notes, $account_id, $_SESSION['user_id']
             ]);
         }
-        $message = "Account सफलतापूर्वक अपडेट भयो!";
-        $message_type = 'success';
+        
+        // Verify the status was saved correctly
+        $verify_stmt = $pdo->prepare("SELECT status FROM trading_accounts WHERE id = ? AND user_id = ?");
+        $verify_stmt->execute([$account_id, $_SESSION['user_id']]);
+        $verified = $verify_stmt->fetch(PDO::FETCH_ASSOC);
+        
+        if ($verified && $verified['status'] !== $status) {
+            // Status wasn't saved correctly - might be ENUM issue
+            $message = "Account अपडेट भयो, तर status save गर्न समस्या भयो। कृपया database मा 'loss' status add गर्नुहोस्।";
+            $message_type = 'warning';
+        } else {
+            $message = "Account सफलतापूर्वक अपडेट भयो!";
+            $message_type = 'success';
+        }
     } catch (PDOException $e) {
         $message = "त्रुटि: " . $e->getMessage();
         $message_type = 'danger';
@@ -1799,54 +1837,223 @@ $reviews = $reviews_stmt->fetchAll(PDO::FETCH_ASSOC);
             border-color: var(--primary-dark);
         }
         
-        .form-control, .form-select {
-            background-color: var(--dark-hover);
-            border: 1px solid var(--border-color);
-            color: var(--text-primary) !important;
+        /* Form Controls - Dark Theme with Green/Yellow/White */
+        .modal-content .form-control, 
+        .modal-content .form-select {
+            background-color: #1f2937 !important;
+            border: 2px solid #10b981 !important;
+            color: #ffffff !important;
+            border-radius: 6px;
+            padding: 10px 15px;
+            transition: all 0.3s ease;
         }
         
-        .form-control:focus, .form-select:focus {
-            background-color: var(--dark-hover);
-            border-color: var(--primary);
-            color: var(--text-primary) !important;
-            box-shadow: 0 0 0 0.25rem rgba(16, 185, 129, 0.25);
+        .modal-content .form-control:focus, 
+        .modal-content .form-select:focus {
+            background-color: #1f2937 !important;
+            border-color: #fbbf24 !important;
+            color: #ffffff !important;
+            box-shadow: 0 0 0 0.25rem rgba(251, 191, 36, 0.25) !important;
+            outline: none;
         }
         
-        .form-control::placeholder {
-            color: var(--text-secondary) !important;
+        .modal-content .form-control::placeholder {
+            color: #9ca3af !important;
             opacity: 0.7;
         }
         
-        .form-label {
-            color: var(--text-primary) !important;
+        .modal-content .form-label {
+            color: #ffffff !important;
             font-weight: 600;
+            margin-bottom: 8px;
         }
         
+        /* Modal Content - Dark Background */
         .modal-content {
-            background-color: var(--dark-card);
-            border: 1px solid var(--border-color);
-            color: var(--text-primary) !important;
+            background-color: #111827 !important;
+            border: 2px solid #10b981 !important;
+            color: #ffffff !important;
+            border-radius: 12px;
+            box-shadow: 0 10px 40px rgba(0, 0, 0, 0.5);
         }
         
+        /* Modal Header - Green Background */
         .modal-header {
-            border-bottom: 1px solid var(--border-color);
-            color: var(--text-primary) !important;
+            background: linear-gradient(135deg, #10b981 0%, #059669 100%) !important;
+            border-bottom: 3px solid #047857 !important;
+            color: #ffffff !important;
+            padding: 20px 25px;
+            border-radius: 10px 10px 0 0;
         }
         
         .modal-header .modal-title {
-            color: var(--text-primary) !important;
+            color: #ffffff !important;
+            font-weight: 700;
+            font-size: 1.25rem;
         }
         
+        .modal-header .btn-close {
+            filter: brightness(0) invert(1);
+            opacity: 0.9;
+        }
+        
+        .modal-header .btn-close:hover {
+            opacity: 1;
+        }
+        
+        /* Modal Footer - Dark with Green Border */
         .modal-footer {
-            border-top: 1px solid var(--border-color);
+            border-top: 2px solid #10b981 !important;
+            background-color: #1f2937 !important;
+            padding: 15px 25px;
+            border-radius: 0 0 10px 10px;
         }
         
+        /* Modal Body - Dark Background */
         .modal-body {
-            color: var(--text-primary) !important;
+            background-color: #111827 !important;
+            color: #ffffff !important;
+            padding: 25px;
         }
         
         .modal-body * {
             color: inherit;
+        }
+        
+        /* Alert Boxes in Modals - Dark Theme */
+        .modal-content .alert-info {
+            background-color: rgba(59, 130, 246, 0.2) !important;
+            border: 2px solid #3b82f6 !important;
+            color: #93c5fd !important;
+        }
+        
+        .modal-content .alert-warning {
+            background-color: rgba(251, 191, 36, 0.2) !important;
+            border: 2px solid #fbbf24 !important;
+            color: #fbbf24 !important;
+        }
+        
+        .modal-content .alert-success {
+            background-color: rgba(16, 185, 129, 0.2) !important;
+            border: 2px solid #10b981 !important;
+            color: #10b981 !important;
+        }
+        
+        /* Buttons in Modals */
+        .modal-footer .btn-primary {
+            background-color: #10b981 !important;
+            border-color: #10b981 !important;
+            color: #ffffff !important;
+            font-weight: 600;
+            padding: 10px 25px;
+            border-radius: 6px;
+            transition: all 0.3s ease;
+        }
+        
+        .modal-footer .btn-primary:hover {
+            background-color: #059669 !important;
+            border-color: #059669 !important;
+            transform: translateY(-2px);
+            box-shadow: 0 4px 12px rgba(16, 185, 129, 0.4);
+            color: #ffffff !important;
+        }
+        
+        .modal-footer .btn-secondary {
+            background-color: #374151 !important;
+            border-color: #374151 !important;
+            color: #ffffff !important;
+            font-weight: 600;
+            padding: 10px 25px;
+            border-radius: 6px;
+            transition: all 0.3s ease;
+        }
+        
+        .modal-footer .btn-secondary:hover {
+            background-color: #4b5563 !important;
+            border-color: #4b5563 !important;
+            transform: translateY(-2px);
+            color: #ffffff !important;
+        }
+        
+        /* Text Muted in Modals - Yellow */
+        .modal-content .text-muted {
+            color: #fbbf24 !important;
+            opacity: 0.9;
+        }
+        
+        /* Small Text in Modals - Yellow */
+        .modal-content small {
+            color: #fbbf24 !important;
+            opacity: 0.9;
+        }
+        
+        /* Card in Modals - Dark Theme */
+        .modal-content .card {
+            background-color: #1f2937 !important;
+            border: 2px solid #10b981 !important;
+        }
+        
+        .modal-content .card-header {
+            background-color: #10b981 !important;
+            color: #ffffff !important;
+            font-weight: 600;
+            border-bottom: 2px solid #059669 !important;
+        }
+        
+        .modal-content .card-body {
+            background-color: #1f2937 !important;
+            color: #ffffff !important;
+        }
+        
+        .modal-content pre {
+            background-color: #1f2937 !important;
+            color: #10b981 !important;
+            border: 1px solid #10b981 !important;
+            padding: 15px;
+            border-radius: 6px;
+        }
+        
+        /* Headings in Modals - Green for primary, Yellow for warning */
+        .modal-content h6.text-primary {
+            color: #10b981 !important;
+            font-weight: 700;
+        }
+        
+        .modal-content h6.text-warning {
+            color: #fbbf24 !important;
+            font-weight: 700;
+        }
+        
+        /* Select Options - Dark Theme */
+        .modal-content .form-select option {
+            background-color: #1f2937 !important;
+            color: #ffffff !important;
+        }
+        
+        /* Strong/Bold Text - Yellow for emphasis */
+        .modal-content strong {
+            color: #fbbf24 !important;
+        }
+        
+        /* Links in Modals - Green */
+        .modal-content a {
+            color: #10b981 !important;
+        }
+        
+        .modal-content a:hover {
+            color: #fbbf24 !important;
+        }
+        
+        /* List Items in Modals - White text */
+        .modal-content ul li,
+        .modal-content ol li {
+            color: #ffffff !important;
+        }
+        
+        /* Important/Required indicators - Yellow */
+        .modal-content .text-danger,
+        .modal-content .text-warning {
+            color: #fbbf24 !important;
         }
         
         /* Tab Styles */
@@ -2713,10 +2920,10 @@ $reviews = $reviews_stmt->fetchAll(PDO::FETCH_ASSOC);
     <!-- Add Trade Modal -->
     <div class="modal fade" id="addTradeModal" tabindex="-1">
         <div class="modal-dialog modal-xl">
-            <div class="modal-content bg-dark">
+            <div class="modal-content">
                 <div class="modal-header">
-                    <h5 class="modal-title">Add New Trade</h5>
-                    <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+                    <h5 class="modal-title"><i class="fas fa-chart-line me-2"></i>Add New Trade</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
                 </div>
                 <div class="modal-body">
                     <form id="tradeForm" action="journal.php" method="POST" enctype="multipart/form-data">
@@ -2889,10 +3096,10 @@ $reviews = $reviews_stmt->fetchAll(PDO::FETCH_ASSOC);
     <!-- Upload CSV Modal -->
     <div class="modal fade" id="uploadCsvModal" tabindex="-1">
         <div class="modal-dialog modal-lg">
-            <div class="modal-content bg-dark">
+            <div class="modal-content">
                 <div class="modal-header">
                     <h5 class="modal-title"><i class="fas fa-file-csv me-2"></i>Upload CSV File</h5>
-                    <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
                 </div>
                 <div class="modal-body">
                     <div class="alert alert-info mb-4" role="alert">
@@ -2940,12 +3147,12 @@ $reviews = $reviews_stmt->fetchAll(PDO::FETCH_ASSOC);
                             </ul>
                         </div>
                         
-                        <div class="card bg-secondary mb-3">
+                        <div class="card mb-3">
                             <div class="card-header">
                                 <strong>Example CSV Format:</strong>
                             </div>
                             <div class="card-body">
-                                <pre class="text-light mb-0" style="font-size: 0.85em;">symbol,trade_date,trade_type,entry_price,exit_price,quantity,stop_loss,take_profit,profit_loss
+                                <pre class="mb-0" style="font-size: 0.85em;">symbol,trade_date,trade_type,entry_price,exit_price,quantity,stop_loss,take_profit,profit_loss
 EURUSD,2024-01-15,buy,1.0850,1.0900,0.01,1.0800,1.0950,50.00
 GBPUSD,2024-01-16,sell,1.2650,1.2600,0.02,1.2700,1.2550,100.00</pre>
                             </div>
@@ -2965,10 +3172,10 @@ GBPUSD,2024-01-16,sell,1.2650,1.2600,0.02,1.2700,1.2550,100.00</pre>
     <!-- Create Account Modal -->
     <div class="modal fade" id="createAccountModal" tabindex="-1">
         <div class="modal-dialog modal-lg">
-            <div class="modal-content bg-dark">
+            <div class="modal-content">
                 <div class="modal-header">
                     <h5 class="modal-title"><i class="fas fa-wallet me-2"></i>Create New Trading Account</h5>
-                    <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
                 </div>
                 <div class="modal-body">
                     <div class="alert alert-info mb-4" role="alert">
@@ -3234,10 +3441,11 @@ GBPUSD,2024-01-16,sell,1.2650,1.2600,0.02,1.2700,1.2550,100.00</pre>
                                     <option value="active">Active</option>
                                     <option value="ongoing">Ongoing (Prop Firm Challenge)</option>
                                     <option value="breach">Breach (Prop Firm Failed)</option>
+                                    <option value="loss">Loss (Account Lost Money)</option>
                                     <option value="inactive">Inactive</option>
                                     <option value="closed">Closed</option>
                                 </select>
-                                <small class="text-muted">Status: Active (regular), Ongoing (prop challenge in progress), Breach (prop challenge failed), Closed (completed/withdrawn)</small>
+                                <small class="text-muted">Status: Active (regular), Ongoing (prop challenge in progress), Breach (prop challenge failed), Loss (account lost money), Closed (completed/withdrawn)</small>
                             </div>
                         </div>
                         
@@ -3777,7 +3985,9 @@ GBPUSD,2024-01-16,sell,1.2650,1.2600,0.02,1.2700,1.2550,100.00</pre>
                 document.getElementById('edit_target_amount').value = account.target_amount || '';
                 document.getElementById('edit_currency').value = account.currency || 'USD';
                 document.getElementById('edit_leverage').value = account.leverage || '';
-                document.getElementById('edit_status').value = account.status || 'active';
+                // Set status - preserve empty/null status, only default if truly missing
+                const statusValue = account.status || (account.account_type === 'propfirm' ? 'ongoing' : 'active');
+                document.getElementById('edit_status').value = statusValue;
                 document.getElementById('edit_notes').value = account.notes || '';
                 
                 // Show/hide challenge fee field based on account type

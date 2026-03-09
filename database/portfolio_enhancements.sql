@@ -28,11 +28,11 @@ EXECUTE alterIfNotExists;
 DEALLOCATE PREPARE alterIfNotExists;
 
 -- ============================================
--- 2. Update account status enum to include ongoing and breach
+-- 2. Update account status enum to include ongoing, breach, and loss
 -- ============================================
 -- Note: MySQL doesn't support ALTER ENUM easily, so we'll use MODIFY
 ALTER TABLE `trading_accounts` 
-MODIFY COLUMN `status` ENUM('active', 'inactive', 'closed', 'ongoing', 'breach') DEFAULT 'active';
+MODIFY COLUMN `status` ENUM('active', 'inactive', 'closed', 'ongoing', 'breach', 'loss') DEFAULT 'active';
 
 -- ============================================
 -- 3. Create withdrawals table
