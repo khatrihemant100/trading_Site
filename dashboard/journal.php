@@ -998,6 +998,7 @@ if ($columns_check_accounts && $columns_check_demo) {
 }
 $accounts = $accounts_stmt->fetchAll(PDO::FETCH_ASSOC);
 
+<<<<<<< HEAD
 // Build filter conditions for trades (include is_demo filter)
 $columns_check_demo = $pdo->query("SHOW COLUMNS FROM trading_journal LIKE 'is_demo'")->fetch();
 $filter_conditions = ["j.user_id = ?"];
@@ -1026,10 +1027,113 @@ if (isset($_GET['filter_date_from']) && !empty($_GET['filter_date_from'])) {
 if (isset($_GET['filter_date_to']) && !empty($_GET['filter_date_to'])) {
     $filter_conditions[] = "j.trade_date <= ?";
     $filter_params[] = $_GET['filter_date_to'];
+=======
+// Refresh account balances from both manual journal + synced MT5 trades
+if (!empty($accounts)) {
+    $account_pl_map = [];
+    $withdrawal_map = [];
+
+    $manual_pl_stmt = $pdo->prepare("
+        SELECT account_id, COALESCE(SUM(profit_loss), 0) as total_pl
+        FROM trading_journal
+        WHERE user_id = ? AND account_id IS NOT NULL " . ($columns_check_demo ? "AND is_demo = ? " : "") . "
+        GROUP BY account_id
+    ");
+    if ($columns_check_demo) {
+        $manual_pl_stmt->execute([$_SESSION['user_id'], $is_demo ? 1 : 0]);
+    } else {
+        $manual_pl_stmt->execute([$_SESSION['user_id']]);
+    }
+    foreach ($manual_pl_stmt->fetchAll(PDO::FETCH_ASSOC) as $row) {
+        $account_pl_map[(int)$row['account_id']] = (float)$row['total_pl'];
+    }
+
+    $mt5_pl_stmt = $pdo->prepare("
+        SELECT m.account_id, COALESCE(SUM(m.profit), 0) as total_pl
+        FROM mt5_trades m
+        INNER JOIN trading_accounts a ON a.id = m.account_id
+        WHERE m.user_id = ? " . ($columns_check_demo ? "AND a.is_demo = ? " : "") . "
+        GROUP BY m.account_id
+    ");
+    if ($columns_check_demo) {
+        $mt5_pl_stmt->execute([$_SESSION['user_id'], $is_demo ? 1 : 0]);
+    } else {
+        $mt5_pl_stmt->execute([$_SESSION['user_id']]);
+    }
+    foreach ($mt5_pl_stmt->fetchAll(PDO::FETCH_ASSOC) as $row) {
+        $accId = (int)$row['account_id'];
+        $account_pl_map[$accId] = ($account_pl_map[$accId] ?? 0.0) + (float)$row['total_pl'];
+    }
+
+    $withdrawal_stmt = $pdo->prepare("
+        SELECT account_id, COALESCE(SUM(withdrawal_amount), 0) as total_withdrawals
+        FROM account_withdrawals
+        WHERE user_id = ? AND account_id IS NOT NULL
+        GROUP BY account_id
+    ");
+    $withdrawal_stmt->execute([$_SESSION['user_id']]);
+    foreach ($withdrawal_stmt->fetchAll(PDO::FETCH_ASSOC) as $row) {
+        $withdrawal_map[(int)$row['account_id']] = (float)$row['total_withdrawals'];
+    }
+
+    foreach ($accounts as &$account) {
+        $accId = (int)$account['id'];
+        $initial = (float)($account['initial_balance'] ?? 0);
+        $totalPl = (float)($account_pl_map[$accId] ?? 0);
+        $withdrawals = (float)($withdrawal_map[$accId] ?? 0);
+        $account['current_balance'] = $initial + $totalPl - $withdrawals;
+    }
+    unset($account);
+}
+
+// Build filter conditions for trades (manual journal + synced MT5 trades)
+$columns_check_demo = $pdo->query("SHOW COLUMNS FROM trading_journal LIKE 'is_demo'")->fetch();
+$journal_conditions = ["j.user_id = ?"];
+$journal_params = [$_SESSION['user_id']];
+
+$mt5_conditions = ["m.user_id = ?"];
+$mt5_params = [$_SESSION['user_id']];
+
+if ($columns_check_demo) {
+    $journal_conditions[] = "j.is_demo = ?";
+    $journal_params[] = $is_demo ? 1 : 0;
+    // mt5_trades मा is_demo हुँदैन, त्यसैले linked trading_accounts बाट mode filter गर्छौं
+    $mt5_conditions[] = "a.is_demo = ?";
+    $mt5_params[] = $is_demo ? 1 : 0;
+}
+
+if ($selected_account_id) {
+    $journal_conditions[] = "j.account_id = ?";
+    $journal_params[] = $selected_account_id;
+    $mt5_conditions[] = "m.account_id = ?";
+    $mt5_params[] = $selected_account_id;
+}
+
+if (isset($_GET['filter_symbol']) && !empty($_GET['filter_symbol'])) {
+    $journal_conditions[] = "j.symbol LIKE ?";
+    $journal_params[] = '%' . $_GET['filter_symbol'] . '%';
+    $mt5_conditions[] = "m.symbol LIKE ?";
+    $mt5_params[] = '%' . $_GET['filter_symbol'] . '%';
+}
+
+if (isset($_GET['filter_date_from']) && !empty($_GET['filter_date_from'])) {
+    $journal_conditions[] = "j.trade_date >= ?";
+    $journal_params[] = $_GET['filter_date_from'];
+    $mt5_conditions[] = "DATE(COALESCE(m.close_time, m.open_time)) >= ?";
+    $mt5_params[] = $_GET['filter_date_from'];
+}
+
+if (isset($_GET['filter_date_to']) && !empty($_GET['filter_date_to'])) {
+    $journal_conditions[] = "j.trade_date <= ?";
+    $journal_params[] = $_GET['filter_date_to'];
+    $mt5_conditions[] = "DATE(COALESCE(m.close_time, m.open_time)) <= ?";
+    $mt5_params[] = $_GET['filter_date_to'];
+>>>>>>> d01e1cd (update)
 }
 
 if (isset($_GET['filter_result']) && $_GET['filter_result'] !== '') {
     $filter_result = $_GET['filter_result'];
+<<<<<<< HEAD
     // Only allow specific values for security
     if (in_array($filter_result, ['win', 'loss', 'breakeven'])) {
         if ($filter_result === 'win') {
@@ -1038,10 +1142,23 @@ if (isset($_GET['filter_result']) && $_GET['filter_result'] !== '') {
             $filter_conditions[] = "j.profit_loss < 0";
         } elseif ($filter_result === 'breakeven') {
             $filter_conditions[] = "(j.profit_loss = 0 OR j.profit_loss IS NULL)";
+=======
+    if (in_array($filter_result, ['win', 'loss', 'breakeven'])) {
+        if ($filter_result === 'win') {
+            $journal_conditions[] = "j.profit_loss > 0";
+            $mt5_conditions[] = "m.profit > 0";
+        } elseif ($filter_result === 'loss') {
+            $journal_conditions[] = "j.profit_loss < 0";
+            $mt5_conditions[] = "m.profit < 0";
+        } elseif ($filter_result === 'breakeven') {
+            $journal_conditions[] = "(j.profit_loss = 0 OR j.profit_loss IS NULL)";
+            $mt5_conditions[] = "(m.profit = 0 OR m.profit IS NULL)";
+>>>>>>> d01e1cd (update)
         }
     }
 }
 
+<<<<<<< HEAD
 $where_clause = implode(' AND ', $filter_conditions);
 
 // Fetch journal entries with filters
@@ -1053,6 +1170,64 @@ $journal_stmt = $pdo->prepare("
     ORDER BY j.trade_date DESC, j.id DESC
 ");
 $journal_stmt->execute($filter_params);
+=======
+$journal_where_clause = implode(' AND ', $journal_conditions);
+$mt5_where_clause = implode(' AND ', $mt5_conditions);
+
+// Fetch manual journal entries + MT5 synced entries together
+$journal_stmt = $pdo->prepare("
+    SELECT 
+        j.id,
+        j.user_id,
+        j.account_id,
+        j.symbol,
+        j.trade_type,
+        j.quantity,
+        j.lot,
+        j.entry_price,
+        j.exit_price,
+        j.stop_loss,
+        j.take_profit,
+        j.r_multiple,
+        j.profit_loss,
+        j.trade_date,
+        j.notes,
+        a.account_name,
+        a.account_type,
+        'journal' as entry_source
+    FROM trading_journal j
+    LEFT JOIN trading_accounts a ON j.account_id = a.id
+    WHERE $journal_where_clause
+
+    UNION ALL
+
+    SELECT
+        m.id,
+        m.user_id,
+        m.account_id,
+        m.symbol,
+        LOWER(CASE WHEN m.order_type LIKE '%BUY%' THEN 'buy' ELSE 'sell' END) as trade_type,
+        m.volume as quantity,
+        m.volume as lot,
+        m.open_price as entry_price,
+        m.close_price as exit_price,
+        NULL as stop_loss,
+        NULL as take_profit,
+        NULL as r_multiple,
+        m.profit as profit_loss,
+        DATE(COALESCE(m.close_time, m.open_time)) as trade_date,
+        m.comment as notes,
+        a.account_name,
+        a.account_type,
+        'mt5' as entry_source
+    FROM mt5_trades m
+    LEFT JOIN trading_accounts a ON m.account_id = a.id
+    WHERE $mt5_where_clause
+
+    ORDER BY trade_date DESC, id DESC
+");
+$journal_stmt->execute(array_merge($journal_params, $mt5_params));
+>>>>>>> d01e1cd (update)
 $journal_entries = $journal_stmt->fetchAll(PDO::FETCH_ASSOC);
 
 // Get comprehensive statistics
@@ -1060,6 +1235,7 @@ $account_stats = null;
 $all_stats = null;
 
 if ($selected_account_id) {
+<<<<<<< HEAD
     $columns_check_demo = $pdo->query("SHOW COLUMNS FROM trading_journal LIKE 'is_demo'")->fetch();
     if ($columns_check_demo) {
         $stats_stmt = $pdo->prepare("
@@ -1097,6 +1273,52 @@ if ($selected_account_id) {
             GROUP BY a.id
         ");
         $stats_stmt->execute([$selected_account_id, $_SESSION['user_id']]);
+=======
+    $stats_stmt = $pdo->prepare("
+        SELECT 
+            a.*,
+            COUNT(x.profit_loss) as total_trades,
+            SUM(CASE WHEN x.profit_loss > 0 THEN 1 ELSE 0 END) as winning_trades,
+            SUM(CASE WHEN x.profit_loss < 0 THEN 1 ELSE 0 END) as losing_trades,
+            COALESCE(SUM(x.profit_loss), 0) as total_pl,
+            COALESCE(AVG(CASE WHEN x.profit_loss > 0 THEN x.profit_loss END), 0) as avg_win,
+            COALESCE(AVG(CASE WHEN x.profit_loss < 0 THEN x.profit_loss END), 0) as avg_loss,
+            COALESCE(MAX(x.profit_loss), 0) as best_trade,
+            COALESCE(MIN(x.profit_loss), 0) as worst_trade
+        FROM trading_accounts a
+        LEFT JOIN (
+            SELECT j.account_id, j.profit_loss
+            FROM trading_journal j
+            WHERE j.user_id = ? " . ($columns_check_demo ? "AND j.is_demo = ? " : "") . "
+
+            UNION ALL
+
+            SELECT m.account_id, m.profit as profit_loss
+            FROM mt5_trades m
+            INNER JOIN trading_accounts ta ON ta.id = m.account_id
+            WHERE m.user_id = ? " . ($columns_check_demo ? "AND ta.is_demo = ? " : "") . "
+        ) x ON x.account_id = a.id
+        WHERE a.id = ? AND a.user_id = ? " . ($columns_check_demo ? "AND a.is_demo = ? " : "") . "
+        GROUP BY a.id
+    ");
+    if ($columns_check_demo) {
+        $stats_stmt->execute([
+            $_SESSION['user_id'],
+            $is_demo ? 1 : 0,
+            $_SESSION['user_id'],
+            $is_demo ? 1 : 0,
+            $selected_account_id,
+            $_SESSION['user_id'],
+            $is_demo ? 1 : 0,
+        ]);
+    } else {
+        $stats_stmt->execute([
+            $_SESSION['user_id'],
+            $_SESSION['user_id'],
+            $selected_account_id,
+            $_SESSION['user_id'],
+        ]);
+>>>>>>> d01e1cd (update)
     }
     $account_stats = $stats_stmt->fetch(PDO::FETCH_ASSOC);
     
@@ -2624,6 +2846,7 @@ $reviews = $reviews_stmt->fetchAll(PDO::FETCH_ASSOC);
                                             <?php endif; ?>
                                         </td>
                                         <td>
+<<<<<<< HEAD
                                             <div class="btn-group btn-group-sm">
                                                 <button class="btn btn-outline-primary" onclick="viewTrade(<?php echo $entry['id']; ?>)" title="View Details">
                                                     <i class="fas fa-eye"></i>
@@ -2632,6 +2855,20 @@ $reviews = $reviews_stmt->fetchAll(PDO::FETCH_ASSOC);
                                                     <i class="fas fa-trash"></i>
                                                 </button>
                                             </div>
+=======
+                                            <?php if (($entry['entry_source'] ?? 'journal') === 'mt5'): ?>
+                                                <span class="badge bg-info text-dark">Synced MT5</span>
+                                            <?php else: ?>
+                                                <div class="btn-group btn-group-sm">
+                                                    <button class="btn btn-outline-primary" onclick="viewTrade(<?php echo $entry['id']; ?>)" title="View Details">
+                                                        <i class="fas fa-eye"></i>
+                                                    </button>
+                                                    <button class="btn btn-outline-danger" onclick="deleteTrade(<?php echo $entry['id']; ?>)" title="Delete">
+                                                        <i class="fas fa-trash"></i>
+                                                    </button>
+                                                </div>
+                                            <?php endif; ?>
+>>>>>>> d01e1cd (update)
                                         </td>
                                     </tr>
                                 <?php endforeach; ?>

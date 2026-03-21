@@ -208,7 +208,11 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                     </li>
                     <?php if (isset($_SESSION['user_id'])): ?>
                     <li class="nav-item">
+<<<<<<< HEAD
                         <a class="nav-link" href="dashboard.php">DASHBOARD</a>
+=======
+                        <a class="nav-link" href="dashboard/dashboard.php">DASHBOARD</a>
+>>>>>>> d01e1cd (update)
                     </li>
                     <?php endif; ?>
                 </ul>

@@ -190,7 +190,11 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 <a href="course.php" class="btn btn-primary">
                     <i class="fas fa-arrow-left me-2"></i>Back to Courses
                 </a>
+<<<<<<< HEAD
                 <a href="../dashboard.php" class="btn btn-outline-primary">
+=======
+                <a href="../dashboard/dashboard.php" class="btn btn-outline-primary">
+>>>>>>> d01e1cd (update)
                     <i class="fas fa-th-large me-2"></i>Go to Dashboard
                 </a>
             </div>

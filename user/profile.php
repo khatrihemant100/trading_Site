@@ -337,7 +337,11 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action'])) {
             <div class="collapse navbar-collapse" id="navbarNav">
                 <ul class="navbar-nav me-auto">
                     <li class="nav-item">
+<<<<<<< HEAD
                         <a class="nav-link" href="../dashboard.php">
+=======
+                        <a class="nav-link" href="../dashboard/dashboard.php">
+>>>>>>> d01e1cd (update)
                             <i class="fas fa-home me-1"></i>ड्यासबोर्ड
                         </a>
                     </li>
@@ -358,7 +362,11 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action'])) {
                             <i class="fas fa-user-circle me-2"></i><?php echo htmlspecialchars($user['username']); ?>
                         </button>
                         <ul class="dropdown-menu dropdown-menu-end">
+<<<<<<< HEAD
                             <li><a class="dropdown-item" href="../dashboard.php">ड्यासबोर्ड</a></li>
+=======
+                            <li><a class="dropdown-item" href="../dashboard/dashboard.php">ड्यासबोर्ड</a></li>
+>>>>>>> d01e1cd (update)
                             <li><a class="dropdown-item" href="profile.php">प्रोफाइल</a></li>
                             <li><hr class="dropdown-divider"></li>
                             <li><a class="dropdown-item text-danger" href="../logout.php">लगआउट</a></li>

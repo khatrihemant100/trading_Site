@@ -302,7 +302,11 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action']) && $_POST['
                     </li>
                     <?php if (isset($_SESSION['user_id'])): ?>
                     <li class="nav-item">
+<<<<<<< HEAD
                         <a class="nav-link active" href="dashboard.php">DASHBOARD</a>
+=======
+                        <a class="nav-link active" href="dashboard/dashboard.php">DASHBOARD</a>
+>>>>>>> d01e1cd (update)
                     </li>
                     <?php endif; ?>
                 </ul>
@@ -327,7 +331,11 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action']) && $_POST['
                                 <span><?php echo htmlspecialchars($_SESSION['username']); ?></span>
                             </button>
                             <ul class="dropdown-menu dropdown-menu-end">
+<<<<<<< HEAD
                                 <li><a class="dropdown-item" href="dashboard.php"><i class="fas fa-th-large me-2"></i>Dashboard</a></li>
+=======
+                                <li><a class="dropdown-item" href="dashboard/dashboard.php"><i class="fas fa-th-large me-2"></i>Dashboard</a></li>
+>>>>>>> d01e1cd (update)
                                 <li><a class="dropdown-item" href="user/profile.php"><i class="fas fa-user me-2"></i>Profile</a></li>
                                 <li><hr class="dropdown-divider"></li>
                                 <li><a class="dropdown-item text-danger" href="logout.php"><i class="fas fa-sign-out-alt me-2"></i>Logout</a></li>
@@ -533,7 +541,11 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action']) && $_POST['
                     <button type="submit" class="btn btn-primary">
                         <i class="fas fa-save me-2"></i>Save Journal Entry
                     </button>
+<<<<<<< HEAD
                     <a href="dashboard.php" class="btn btn-secondary">
+=======
+                    <a href="dashboard/dashboard.php" class="btn btn-secondary">
+>>>>>>> d01e1cd (update)
                         <i class="fas fa-times me-2"></i>Cancel
                     </a>
                 </div>

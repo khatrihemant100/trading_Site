@@ -257,7 +257,11 @@ if (!isCoursesEnabled()) {
                     </li>
                     <?php if (isset($_SESSION['user_id'])): ?>
                     <li class="nav-item">
+<<<<<<< HEAD
                         <a class="nav-link" href="../dashboard.php">DASHBOARD</a>
+=======
+                        <a class="nav-link" href="../dashboard/dashboard.php">DASHBOARD</a>
+>>>>>>> d01e1cd (update)
                     </li>
                     <?php endif; ?>
                 </ul>
@@ -282,7 +286,11 @@ if (!isCoursesEnabled()) {
                                 <span><?php echo htmlspecialchars($_SESSION['username']); ?></span>
                             </button>
                             <ul class="dropdown-menu dropdown-menu-end">
+<<<<<<< HEAD
                                 <li><a class="dropdown-item" href="../dashboard.php"><i class="fas fa-th-large me-2"></i>Dashboard</a></li>
+=======
+                                <li><a class="dropdown-item" href="../dashboard/dashboard.php"><i class="fas fa-th-large me-2"></i>Dashboard</a></li>
+>>>>>>> d01e1cd (update)
                                 <li><a class="dropdown-item" href="../user/profile.php"><i class="fas fa-user me-2"></i>Profile</a></li>
                                 <li><hr class="dropdown-divider"></li>
                                 <li><a class="dropdown-item text-danger" href="../logout.php"><i class="fas fa-sign-out-alt me-2"></i>Logout</a></li>

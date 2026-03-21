@@ -26,6 +26,11 @@ require_once __DIR__.'/includes/check_course_status.php';
             font-family: 'Poppins', sans-serif;
             background-color: var(--dark-bg);
             color: var(--text-primary);
+<<<<<<< HEAD
+=======
+            line-height: 1.65;
+            letter-spacing: 0.01em;
+>>>>>>> d01e1cd (update)
         }
         
         .navbar {
@@ -81,6 +86,31 @@ require_once __DIR__.'/includes/check_course_status.php';
             margin-right: -0.5rem;
             padding-left: 1rem;
         }
+<<<<<<< HEAD
+=======
+
+        /* Marquee / ticker strip just below navbar */
+        .ticker-strip {
+            background-color: var(--dark-card);
+            border-bottom: 1px solid var(--border-color);
+            padding: 6px 0;
+        }
+
+        .ticker-strip .ticker-container {
+            padding-left: 0.5rem;
+            padding-right: 0.5rem;
+        }
+
+        .ticker-strip .tradingview-widget-container {
+            width: 100% !important;
+            height: 36px !important;
+            margin: 0 auto;
+        }
+
+        .ticker-strip .tradingview-widget-container__widget {
+            height: 100% !important;
+        }
+>>>>>>> d01e1cd (update)
         
         @media (max-width: 991px) {
             .navbar .container {
@@ -144,9 +174,18 @@ require_once __DIR__.'/includes/check_course_status.php';
         }
         
         .hero-section {
+<<<<<<< HEAD
             background: url('img/hero.head.png') center/cover no-repeat;
             color: white;
             padding: 150px 0;
+=======
+            background:
+                radial-gradient(circle at 20% 20%, rgba(30, 64, 175, 0.25), transparent 35%),
+                radial-gradient(circle at 80% 10%, rgba(16, 185, 129, 0.2), transparent 30%),
+                linear-gradient(145deg, #050b18 0%, #0b1328 45%, #111827 100%);
+            color: white;
+            padding: 140px 0 120px;
+>>>>>>> d01e1cd (update)
             position: relative;
             overflow: hidden;
             min-height: 600px;
@@ -176,7 +215,11 @@ require_once __DIR__.'/includes/check_course_status.php';
             left: 0;
             right: 0;
             bottom: 0;
+<<<<<<< HEAD
             background: rgba(0, 0, 0, 0.25);
+=======
+            background: rgba(2, 6, 23, 0.45);
+>>>>>>> d01e1cd (update)
             z-index: 1;
         }
         
@@ -190,6 +233,10 @@ require_once __DIR__.'/includes/check_course_status.php';
             filter: blur(80px);
             z-index: 2;
             animation: glowMove 8s ease-in-out infinite;
+<<<<<<< HEAD
+=======
+            opacity: 0.65;
+>>>>>>> d01e1cd (update)
         }
         
         .hero-glow-1 {
@@ -217,7 +264,11 @@ require_once __DIR__.'/includes/check_course_status.php';
             height: 2px;
             background: linear-gradient(90deg, transparent, rgba(16, 185, 129, 0.4), transparent);
             z-index: 2;
+<<<<<<< HEAD
             opacity: 0.3;
+=======
+            opacity: 0.18;
+>>>>>>> d01e1cd (update)
         }
         
         .chart-line-1 {
@@ -236,6 +287,60 @@ require_once __DIR__.'/includes/check_course_status.php';
             animation: chartMove3 18s linear infinite;
             background: linear-gradient(90deg, transparent, rgba(245, 158, 11, 0.3), transparent);
         }
+<<<<<<< HEAD
+=======
+
+        .candlestick-layer {
+            position: absolute;
+            inset: 0;
+            z-index: 2;
+            pointer-events: none;
+            overflow: hidden;
+        }
+
+        .candlestick-layer.back {
+            opacity: 0.12;
+            filter: blur(1px);
+        }
+
+        .candlestick-layer.front {
+            opacity: 0.2;
+        }
+
+        .candlestick {
+            position: absolute;
+            width: 9px;
+            animation: candleSlide linear infinite;
+            will-change: transform, opacity;
+        }
+
+        .candlestick .wick {
+            position: absolute;
+            left: 50%;
+            transform: translateX(-50%);
+            width: 2px;
+            border-radius: 999px;
+        }
+
+        .candlestick .body {
+            position: absolute;
+            left: 0;
+            width: 100%;
+            border-radius: 2px;
+        }
+
+        .candlestick.bull .wick,
+        .candlestick.bull .body {
+            background: rgba(16, 185, 129, 0.95);
+            box-shadow: 0 0 8px rgba(16, 185, 129, 0.5);
+        }
+
+        .candlestick.bear .wick,
+        .candlestick.bear .body {
+            background: rgba(239, 68, 68, 0.95);
+            box-shadow: 0 0 8px rgba(239, 68, 68, 0.45);
+        }
+>>>>>>> d01e1cd (update)
         
         @keyframes chartMove1 {
             0% { transform: translateX(-100%); }
@@ -251,6 +356,16 @@ require_once __DIR__.'/includes/check_course_status.php';
             0% { transform: translateX(-100%); }
             100% { transform: translateX(100%); }
         }
+<<<<<<< HEAD
+=======
+
+        @keyframes candleSlide {
+            0% { transform: translateX(-10vw) translateY(0px); opacity: 0; }
+            12% { opacity: 1; }
+            50% { transform: translateX(45vw) translateY(-3px); }
+            100% { transform: translateX(112vw) translateY(0px); opacity: 0; }
+        }
+>>>>>>> d01e1cd (update)
         
         /* Floating financial numbers */
         .floating-number {
@@ -262,6 +377,10 @@ require_once __DIR__.'/includes/check_course_status.php';
             z-index: 2;
             text-shadow: 0 0 10px rgba(16, 185, 129, 0.5);
             pointer-events: none;
+<<<<<<< HEAD
+=======
+            opacity: 0.55;
+>>>>>>> d01e1cd (update)
         }
         
         .floating-number.positive {
@@ -285,7 +404,11 @@ require_once __DIR__.'/includes/check_course_status.php';
                 linear-gradient(90deg, rgba(16, 185, 129, 0.03) 1px, transparent 1px);
             background-size: 50px 50px;
             z-index: 2;
+<<<<<<< HEAD
             opacity: 0.4;
+=======
+            opacity: 0.24;
+>>>>>>> d01e1cd (update)
             animation: gridPulse 4s ease-in-out infinite;
         }
         
@@ -304,6 +427,10 @@ require_once __DIR__.'/includes/check_course_status.php';
             z-index: 2;
             box-shadow: 0 0 10px rgba(16, 185, 129, 0.8);
             animation: dataPointPulse 3s ease-in-out infinite;
+<<<<<<< HEAD
+=======
+            opacity: 0.45;
+>>>>>>> d01e1cd (update)
         }
         
         @keyframes dataPointPulse {
@@ -315,6 +442,17 @@ require_once __DIR__.'/includes/check_course_status.php';
             position: relative;
             z-index: 10;
             text-shadow: 2px 2px 12px rgba(0, 0, 0, 0.9), 0 0 30px rgba(0, 0, 0, 0.6);
+<<<<<<< HEAD
+=======
+            max-width: 900px;
+            margin: 0 auto;
+            padding: 2rem 1.4rem;
+            border-radius: 16px;
+            background: rgba(15, 23, 42, 0.5);
+            border: 1px solid rgba(148, 163, 184, 0.2);
+            backdrop-filter: blur(8px);
+            -webkit-backdrop-filter: blur(8px);
+>>>>>>> d01e1cd (update)
         }
         
         .hero-title {
@@ -322,7 +460,11 @@ require_once __DIR__.'/includes/check_course_status.php';
             font-weight: 800;
             margin-bottom: 1.5rem;
             line-height: 1.2;
+<<<<<<< HEAD
             background: linear-gradient(135deg, #fbbf24 0%, #f59e0b 30%, #10b981 60%, #3b82f6 100%);
+=======
+            background: linear-gradient(135deg, #fde68a 0%, #f59e0b 22%, #22d3ee 52%, #34d399 76%, #a78bfa 100%);
+>>>>>>> d01e1cd (update)
             -webkit-background-clip: text;
             -webkit-text-fill-color: transparent;
             background-clip: text;
@@ -333,7 +475,11 @@ require_once __DIR__.'/includes/check_course_status.php';
             align-items: center;
             justify-content: center;
             gap: 0.3rem;
+<<<<<<< HEAD
             filter: drop-shadow(0 0 30px rgba(251, 191, 36, 0.4));
+=======
+            filter: drop-shadow(0 0 18px rgba(253, 230, 138, 0.45)) drop-shadow(0 0 26px rgba(34, 211, 238, 0.25));
+>>>>>>> d01e1cd (update)
             animation: titleGradient 5s ease infinite;
             background-size: 200% 200%;
         }
@@ -348,18 +494,32 @@ require_once __DIR__.'/includes/check_course_status.php';
             display: inline-block;
             width: 3px;
             height: 3.5rem;
+<<<<<<< HEAD
             background: linear-gradient(180deg, #fbbf24 0%, #10b981 100%);
             animation: blink 1s infinite, cursorGlow 2s ease-in-out infinite;
             margin-left: 5px;
             box-shadow: 0 0 15px rgba(251, 191, 36, 0.8), 0 0 25px rgba(16, 185, 129, 0.6);
+=======
+            background: linear-gradient(180deg, #fde68a 0%, #22d3ee 45%, #34d399 100%);
+            animation: blink 1s infinite, cursorGlow 2s ease-in-out infinite;
+            margin-left: 5px;
+            box-shadow: 0 0 14px rgba(253, 230, 138, 0.75), 0 0 24px rgba(34, 211, 238, 0.55);
+>>>>>>> d01e1cd (update)
         }
         
         @keyframes cursorGlow {
             0%, 100% { 
+<<<<<<< HEAD
                 box-shadow: 0 0 15px rgba(251, 191, 36, 0.8), 0 0 25px rgba(16, 185, 129, 0.6);
             }
             50% { 
                 box-shadow: 0 0 25px rgba(251, 191, 36, 1), 0 0 40px rgba(16, 185, 129, 0.9);
+=======
+                box-shadow: 0 0 14px rgba(253, 230, 138, 0.75), 0 0 24px rgba(34, 211, 238, 0.55);
+            }
+            50% { 
+                box-shadow: 0 0 22px rgba(253, 230, 138, 0.95), 0 0 38px rgba(52, 211, 153, 0.7);
+>>>>>>> d01e1cd (update)
             }
         }
         
@@ -379,6 +539,7 @@ require_once __DIR__.'/includes/check_course_status.php';
             max-width: 850px;
             margin-left: auto;
             margin-right: auto;
+<<<<<<< HEAD
             text-shadow: 2px 2px 12px rgba(0, 0, 0, 0.95), 0 0 20px rgba(0, 0, 0, 0.5);
             font-weight: 400;
             animation: subtitleFadeIn 1.2s ease-out;
@@ -434,6 +595,10 @@ require_once __DIR__.'/includes/check_course_status.php';
                 opacity: 1;
                 box-shadow: 0 0 20px rgba(251, 191, 36, 0.9), 0 0 30px rgba(16, 185, 129, 0.6);
             }
+=======
+            font-weight: 400;
+            line-height: 1.9;
+>>>>>>> d01e1cd (update)
         }
         
         @media (max-width: 768px) {
@@ -456,6 +621,7 @@ require_once __DIR__.'/includes/check_course_status.php';
         }
         
         .hero-cta {
+<<<<<<< HEAD
             background-color: #10b981;
             color: #fbbf24;
             padding: 15px 40px;
@@ -467,15 +633,35 @@ require_once __DIR__.'/includes/check_course_status.php';
             text-decoration: none;
             display: inline-block;
             box-shadow: 0 4px 15px rgba(0, 0, 0, 0.3);
+=======
+            background: linear-gradient(135deg, #22c55e 0%, #10b981 55%, #0ea5e9 100%);
+            color: #fef3c7;
+            padding: 16px 42px;
+            font-size: 1.1rem;
+            font-weight: 700;
+            border-radius: 14px;
+            border: 1px solid rgba(52, 211, 153, 0.7);
+            transition: all 0.3s ease;
+            text-decoration: none;
+            display: inline-block;
+            box-shadow: 0 12px 24px rgba(16, 185, 129, 0.35), 0 0 24px rgba(14, 165, 233, 0.25), 0 6px 18px rgba(0, 0, 0, 0.35);
+>>>>>>> d01e1cd (update)
             margin-top: 1.5rem;
             letter-spacing: 0.5px;
         }
         
         .hero-cta:hover {
+<<<<<<< HEAD
             background-color: #059669;
             color: #f59e0b;
             transform: translateY(-3px) scale(1.05);
             box-shadow: 0 6px 20px rgba(0, 0, 0, 0.4), 0 0 30px rgba(16, 185, 129, 0.5);
+=======
+            background: linear-gradient(135deg, #16a34a 0%, #059669 55%, #0284c7 100%);
+            color: #fff7ed;
+            transform: translateY(-4px) scale(1.03);
+            box-shadow: 0 14px 28px rgba(16, 185, 129, 0.45), 0 0 28px rgba(14, 165, 233, 0.32), 0 8px 20px rgba(0, 0, 0, 0.4);
+>>>>>>> d01e1cd (update)
         }
         
         .hero-cta:active {
@@ -485,7 +671,11 @@ require_once __DIR__.'/includes/check_course_status.php';
         
         .features-section {
             background-color: var(--dark-bg);
+<<<<<<< HEAD
             padding: 100px 0;
+=======
+            padding: 110px 0;
+>>>>>>> d01e1cd (update)
         }
         
         .features-title {
@@ -497,6 +687,7 @@ require_once __DIR__.'/includes/check_course_status.php';
         }
         
         .feature-card {
+<<<<<<< HEAD
             background-color: var(--dark-card);
             border: 1px solid var(--border-color);
             border-radius: 12px;
@@ -510,19 +701,47 @@ require_once __DIR__.'/includes/check_course_status.php';
             transform: translateY(-5px);
             border-color: var(--primary);
             box-shadow: 0 15px 40px rgba(16, 185, 129, 0.2);
+=======
+            background: rgba(255, 255, 255, 0.03);
+            border: 1px solid rgba(255, 255, 255, 0.08);
+            border-radius: 15px;
+            padding: 40px 30px;
+            text-align: center;
+            transition: all 0.3s ease;
+            height: 100%;
+            backdrop-filter: blur(10px);
+            -webkit-backdrop-filter: blur(10px);
+            box-shadow: 0 14px 28px rgba(0, 0, 0, 0.24);
+        }
+        
+        .feature-card:hover {
+            transform: translateY(-6px);
+            border-color: var(--primary);
+            box-shadow: 0 22px 40px rgba(0, 0, 0, 0.3), 0 0 22px rgba(16, 185, 129, 0.2);
+>>>>>>> d01e1cd (update)
         }
         
         .feature-icon {
             width: 70px;
             height: 70px;
+<<<<<<< HEAD
             background: linear-gradient(135deg, rgba(16, 185, 129, 0.2) 0%, rgba(5, 150, 105, 0.2) 100%);
             border-radius: 12px;
+=======
+            background: radial-gradient(circle at 30% 30%, rgba(16, 185, 129, 0.3), rgba(5, 150, 105, 0.18));
+            border-radius: 50%;
+>>>>>>> d01e1cd (update)
             display: flex;
             align-items: center;
             justify-content: center;
             margin: 0 auto 25px;
             font-size: 2rem;
             color: var(--primary);
+<<<<<<< HEAD
+=======
+            border: 1px solid rgba(16, 185, 129, 0.35);
+            box-shadow: 0 0 20px rgba(16, 185, 129, 0.2);
+>>>>>>> d01e1cd (update)
         }
         
         .feature-card h3 {
@@ -595,7 +814,11 @@ require_once __DIR__.'/includes/check_course_status.php';
         
         .community-section {
             --dark-bg: #0f172a;
+<<<<<<< HEAD
             padding: 80px 0;
+=======
+            padding: 100px 0;
+>>>>>>> d01e1cd (update)
             color: white;
         }
         
@@ -612,12 +835,30 @@ require_once __DIR__.'/includes/check_course_status.php';
         }
         
         .trader-card {
+<<<<<<< HEAD
             background: var(--dark-card);
             border: 1px solid var(--border-color);
             border-radius: 15px;
             padding: 30px;
             box-shadow: 0 10px 30px rgba(0,0,0,0.3);
             height: 100%;
+=======
+            background: rgba(255, 255, 255, 0.03);
+            border: 1px solid rgba(255, 255, 255, 0.08);
+            border-radius: 15px;
+            padding: 34px;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.3);
+            height: 100%;
+            backdrop-filter: blur(10px);
+            -webkit-backdrop-filter: blur(10px);
+            transition: all 0.3s ease;
+        }
+
+        .trader-card:hover {
+            transform: translateY(-6px);
+            border-color: rgba(16, 185, 129, 0.45);
+            box-shadow: 0 18px 34px rgba(0, 0, 0, 0.34), 0 0 18px rgba(16, 185, 129, 0.16);
+>>>>>>> d01e1cd (update)
         }
         
         .trader-card h4 {
@@ -630,25 +871,45 @@ require_once __DIR__.'/includes/check_course_status.php';
         .platform-btn {
             width: 100%;
             height: 80px;
+<<<<<<< HEAD
             border: 1px solid var(--border-color);
             border-radius: 12px;
             background: var(--dark-bg);
+=======
+            border: 1px solid rgba(255, 255, 255, 0.12);
+            border-radius: 14px;
+            background: rgba(15, 23, 42, 0.72);
+>>>>>>> d01e1cd (update)
             display: flex;
             align-items: center;
             justify-content: center;
             gap: 12px;
+<<<<<<< HEAD
             transition: all 0.3s;
+=======
+            transition: all 0.3s ease;
+>>>>>>> d01e1cd (update)
             text-decoration: none;
             color: var(--text-primary);
             font-weight: 600;
             margin-bottom: 15px;
+<<<<<<< HEAD
+=======
+            box-shadow: 0 8px 18px rgba(0, 0, 0, 0.2);
+>>>>>>> d01e1cd (update)
         }
         
         .platform-btn:hover {
             border-color: var(--primary);
+<<<<<<< HEAD
             background: var(--dark-hover);
             transform: translateY(-3px);
             box-shadow: 0 5px 15px rgba(16, 185, 129, 0.3);
+=======
+            background: rgba(51, 65, 85, 0.86);
+            transform: translateY(-4px) scale(1.01);
+            box-shadow: 0 12px 24px rgba(16, 185, 129, 0.25);
+>>>>>>> d01e1cd (update)
             color: var(--primary);
         }
         
@@ -674,7 +935,11 @@ require_once __DIR__.'/includes/check_course_status.php';
         
         .social-media-section {
             --dark-bg: #0f172a;
+<<<<<<< HEAD
             padding: 80px 0;
+=======
+            padding: 92px 0;
+>>>>>>> d01e1cd (update)
             color: white;
         }
         
@@ -696,25 +961,43 @@ require_once __DIR__.'/includes/check_course_status.php';
             display: flex;
             flex-direction: column;
             align-items: center;
+<<<<<<< HEAD
             transition: transform 0.3s;
             padding: 20px;
+=======
+            transition: all 0.3s ease;
+            padding: 18px 12px;
+            border-radius: 14px;
+            border: 1px solid transparent;
+>>>>>>> d01e1cd (update)
         }
         
         .social-link:hover {
             transform: translateY(-5px);
             color: white;
+<<<<<<< HEAD
+=======
+            border-color: rgba(16, 185, 129, 0.38);
+            box-shadow: 0 12px 26px rgba(16, 185, 129, 0.18);
+>>>>>>> d01e1cd (update)
         }
         
         .social-icon {
             width: 60px;
             height: 60px;
+<<<<<<< HEAD
             border-radius: 12px;
             background: rgba(255, 255, 255, 0.2);
+=======
+            border-radius: 14px;
+            background: rgba(255, 255, 255, 0.08);
+>>>>>>> d01e1cd (update)
             display: flex;
             align-items: center;
             justify-content: center;
             font-size: 1.8rem;
             margin-bottom: 15px;
+<<<<<<< HEAD
             border: 2px solid rgba(255, 255, 255, 0.3);
             transition: all 0.3s;
         }
@@ -723,6 +1006,18 @@ require_once __DIR__.'/includes/check_course_status.php';
             background: rgba(255, 255, 255, 0.3);
             border-color: rgba(255, 255, 255, 0.5);
             transform: scale(1.1);
+=======
+            border: 1px solid rgba(255, 255, 255, 0.2);
+            transition: all 0.3s ease;
+            box-shadow: 0 10px 20px rgba(0, 0, 0, 0.25);
+        }
+        
+        .social-link:hover .social-icon {
+            background: rgba(30, 41, 59, 0.85);
+            border-color: rgba(16, 185, 129, 0.45);
+            transform: scale(1.08);
+            box-shadow: 0 0 18px rgba(16, 185, 129, 0.2);
+>>>>>>> d01e1cd (update)
         }
         
         .social-link span {
@@ -730,10 +1025,48 @@ require_once __DIR__.'/includes/check_course_status.php';
             font-size: 0.95rem;
             text-align: center;
         }
+<<<<<<< HEAD
+=======
+
+        .success-section .card {
+            border-radius: 14px;
+            overflow: hidden;
+            background: rgba(255, 255, 255, 0.03) !important;
+            border: 1px solid rgba(255, 255, 255, 0.08) !important;
+            backdrop-filter: blur(10px);
+            -webkit-backdrop-filter: blur(10px);
+            box-shadow: 0 16px 30px rgba(0, 0, 0, 0.28), 0 0 16px rgba(16, 185, 129, 0.12);
+        }
+
+        .success-section .blockquote p {
+            line-height: 1.85;
+            padding-left: 14px;
+            position: relative;
+        }
+
+        .success-section .blockquote p::before {
+            content: "\201C";
+            position: absolute;
+            left: -2px;
+            top: -8px;
+            font-size: 1.8rem;
+            color: rgba(16, 185, 129, 0.6);
+        }
+
+        footer {
+            padding-top: 2.2rem !important;
+            padding-bottom: 2rem !important;
+        }
+
+        footer .row > div {
+            margin-bottom: 0.8rem;
+        }
+>>>>>>> d01e1cd (update)
     </style>
 </head>
 <body>
     <!-- Navigation Bar -->
+<<<<<<< HEAD
     <nav class="navbar navbar-expand-lg navbar-light sticky-top">
         <div class="container">
             <a class="navbar-brand fw-bold" href="index.php">
@@ -800,6 +1133,9 @@ require_once __DIR__.'/includes/check_course_status.php';
             </div>
         </div>
     </nav>
+=======
+    <?php include __DIR__.'/includes/navbar.php'; ?>
+>>>>>>> d01e1cd (update)
 
     <!-- Hero Section -->
     <section class="hero-section">
@@ -814,6 +1150,12 @@ require_once __DIR__.'/includes/check_course_status.php';
         <div class="chart-line chart-line-1"></div>
         <div class="chart-line chart-line-2"></div>
         <div class="chart-line chart-line-3"></div>
+<<<<<<< HEAD
+=======
+
+        <div id="candlesBack" class="candlestick-layer back"></div>
+        <div id="candlesFront" class="candlestick-layer front"></div>
+>>>>>>> d01e1cd (update)
         
         <!-- Floating financial numbers (will be generated by JS) -->
         <div id="floatingNumbers"></div>
@@ -827,11 +1169,19 @@ require_once __DIR__.'/includes/check_course_status.php';
                     <span id="typing-text"></span><span class="typing-cursor">|</span>
                 </h1>
                 <p class="hero-subtitle">
+<<<<<<< HEAD
                     <span class="subtitle-highlight">Transform</span> your trading with AI-powered insights, 
                     <span class="subtitle-highlight">analyze</span> every trade like a pro, and 
                     <span class="subtitle-highlight">connect</span> with Nepal's elite trading community
                 </p>
                 <a href="register.php" class="hero-cta">Start Trading Smarter</a>
+=======
+                    Transform your trading with AI-powered insights,
+                    analyze every trade like a pro, and
+                    connect with Nepal's elite trading community
+                </p>
+                <a href="<?php echo isset($_SESSION['user_id']) ? 'dashboard/dashboard.php' : 'register.php'; ?>" class="hero-cta">Start Trading Smarter</a>
+>>>>>>> d01e1cd (update)
             </div>
         </div>
     </section>
@@ -872,6 +1222,10 @@ require_once __DIR__.'/includes/check_course_status.php';
                         <h3>Community</h3>
                         <p>Share insights and learn from other traders</p>
                     </div>
+<<<<<<< HEAD
+=======
+
+>>>>>>> d01e1cd (update)
                 </div>
                 
                 <!-- Feature 4: Psychology Tools -->
@@ -889,7 +1243,11 @@ require_once __DIR__.'/includes/check_course_status.php';
     </section>
 
     <!-- Success Stories -->
+<<<<<<< HEAD
     <section class="py-5" style="background-color: var(--dark-card);">
+=======
+    <section class="py-5 success-section" style="background-color: var(--dark-card);">
+>>>>>>> d01e1cd (update)
         <div class="container">
             <h2 class="text-center mb-5" style="color: var(--text-primary); font-size: 2.5rem; font-weight: 700;">Success Stories</h2>
             <div class="row justify-content-center">
@@ -1144,7 +1502,11 @@ require_once __DIR__.'/includes/check_course_status.php';
             const numbers = ['+2.45%', '+$1,234', '+5.67%', '-1.23%', '+$890', '+3.21%', '+$567', '-0.45%', '+$1,890', '+4.56%'];
             const isPositive = [true, true, true, false, true, true, true, false, true, true];
             
+<<<<<<< HEAD
             for (let i = 0; i < 15; i++) {
+=======
+            for (let i = 0; i < 8; i++) {
+>>>>>>> d01e1cd (update)
                 const number = document.createElement('div');
                 number.className = `floating-number ${isPositive[i % isPositive.length] ? 'positive' : 'negative'}`;
                 number.textContent = numbers[i % numbers.length];
@@ -1168,7 +1530,11 @@ require_once __DIR__.'/includes/check_course_status.php';
         function createDataPoints() {
             const container = document.getElementById('dataPoints');
             
+<<<<<<< HEAD
             for (let i = 0; i < 20; i++) {
+=======
+            for (let i = 0; i < 10; i++) {
+>>>>>>> d01e1cd (update)
                 const point = document.createElement('div');
                 point.className = 'data-point';
                 
@@ -1183,6 +1549,57 @@ require_once __DIR__.'/includes/check_course_status.php';
                 container.appendChild(point);
             }
         }
+<<<<<<< HEAD
+=======
+
+        function buildCandles(layerId, count, speedBase, speedRange, topBase, topRange) {
+            const layer = document.getElementById(layerId);
+            if (!layer) return;
+            layer.innerHTML = '';
+
+            let anchor = 46 + Math.random() * 8;
+            for (let i = 0; i < count; i++) {
+                const delta = (Math.random() - 0.5) * 12;
+                const open = anchor;
+                const close = anchor + delta;
+                const high = Math.max(open, close) + (2 + Math.random() * 4);
+                const low = Math.min(open, close) - (2 + Math.random() * 4);
+                anchor = close;
+
+                const candle = document.createElement('div');
+                candle.className = `candlestick ${close >= open ? 'bull' : 'bear'}`;
+
+                const wick = document.createElement('span');
+                wick.className = 'wick';
+                const body = document.createElement('span');
+                body.className = 'body';
+
+                const wickHeight = Math.max(18, (high - low) * 2.2);
+                const bodyHeight = Math.max(7, Math.abs(close - open) * 2.2);
+
+                candle.style.left = `${(i / count) * 100}%`;
+                candle.style.top = `${topBase + Math.random() * topRange}%`;
+                candle.style.height = `${wickHeight}px`;
+                candle.style.animationDuration = `${speedBase + Math.random() * speedRange}s`;
+                candle.style.animationDelay = `${Math.random() * 2.5}s`;
+
+                wick.style.height = `${wickHeight}px`;
+                wick.style.top = '0';
+                body.style.height = `${bodyHeight}px`;
+                body.style.top = `${(wickHeight - bodyHeight) / 2}px`;
+
+                candle.appendChild(wick);
+                candle.appendChild(body);
+                layer.appendChild(candle);
+            }
+        }
+
+        function renderCandlesticks() {
+            // Depth effect: slower faint layer + faster front layer
+            buildCandles('candlesBack', 18, 18, 8, 28, 42);
+            buildCandles('candlesFront', 24, 11, 6, 22, 50);
+        }
+>>>>>>> d01e1cd (update)
         
         // Floating number animation
         const style = document.createElement('style');
@@ -1210,18 +1627,31 @@ require_once __DIR__.'/includes/check_course_status.php';
         document.addEventListener('DOMContentLoaded', function() {
             createFloatingNumbers();
             createDataPoints();
+<<<<<<< HEAD
+=======
+            renderCandlesticks();
+>>>>>>> d01e1cd (update)
             
             // Regenerate numbers every 15 seconds for continuous effect
             setInterval(() => {
                 const container = document.getElementById('floatingNumbers');
                 container.innerHTML = '';
                 createFloatingNumbers();
+<<<<<<< HEAD
             }, 15000);
+=======
+            }, 22000);
+
+            setInterval(() => {
+                renderCandlesticks();
+            }, 16000);
+>>>>>>> d01e1cd (update)
         });
     </script>
     
     <?php include __DIR__.'/includes/coming_soon_notification.php'; ?>
     
+<<<<<<< HEAD
     <script>
         <?php if (!isCoursesEnabled()): ?>
         function handleCourseClick(event) {
@@ -1232,4 +1662,8 @@ require_once __DIR__.'/includes/check_course_status.php';
         <?php endif; ?>
     </script>
 </body>
+=======
+</body>
+</html>
+>>>>>>> d01e1cd (update)
 </html>

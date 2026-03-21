@@ -1451,6 +1451,27 @@ try {
         body.demo-mode-active .top-bar {
             border-bottom-color: rgba(251, 191, 36, 0.2);
         }
+<<<<<<< HEAD
+=======
+
+        /* TradingView widgets sizing (some widgets need explicit height) */
+        .tv-widget-root {
+            width: 100%;
+            height: 820px;
+        }
+
+        .tv-widget-root .tradingview-widget-container,
+        .tv-widget-root .tradingview-widget-container__widget {
+            width: 100% !important;
+            height: 100% !important;
+        }
+
+        @media (max-width: 768px) {
+            .tv-widget-root {
+                height: 620px;
+            }
+        }
+>>>>>>> d01e1cd (update)
     </style>
 </head>
 <body class="<?php echo $is_demo ? 'demo-mode-active' : ''; ?>">
@@ -1582,6 +1603,21 @@ try {
                 </a>
             </li>
             <li class="nav-item">
+<<<<<<< HEAD
+=======
+                <a href="#live-market" class="nav-link section-nav">
+                    <i class="fas fa-chart-line"></i>
+                    <span>LIVE Market</span>
+                </a>
+            </li>
+            <li class="nav-item">
+                <a href="#economic" class="nav-link section-nav">
+                    <i class="fas fa-globe"></i>
+                    <span>Economic</span>
+                </a>
+            </li>
+            <li class="nav-item">
+>>>>>>> d01e1cd (update)
                 <a href="Community.php" class="nav-link">
                     <i class="fas fa-users"></i>
                     <span>Community</span>
@@ -1664,6 +1700,60 @@ try {
             
         </div>
 
+<<<<<<< HEAD
+=======
+        <!-- Trading / Economic Widgets -->
+        <section id="live-market" class="dashboard-section section-widget">
+            <div class="content-card">
+                <div class="content-card-title">
+                    <i class="fas fa-chart-line me-2" style="color: var(--primary);"></i>LIVE Market
+                </div>
+                <div class="tv-widget-root">
+                    <iframe
+                        src="https://html.cafe/x6d00fdf6"
+                        title="Live Market"
+                        style="width:100%;height:100%;border:0;border-radius:8px;background:#0b1220;"
+                        loading="lazy"
+                        referrerpolicy="no-referrer-when-downgrade">
+                    </iframe>
+                </div>
+            </div>
+        </section>
+
+        <section id="economic" class="dashboard-section section-widget">
+            <div class="content-card">
+                <div class="content-card-title">
+                    <i class="fas fa-globe me-2" style="color: var(--primary);"></i>Economic
+                </div>
+                <div class="mb-4">
+                    <h6 class="mb-3" style="color: var(--text-secondary);">Economic News</h6>
+                    <div class="tv-widget-root" style="height: 680px;">
+                        <iframe
+                            src="https://html.cafe/x77d3a315"
+                            title="Economic News"
+                            style="width:100%;height:100%;border:0;border-radius:8px;background:#0b1220;"
+                            loading="lazy"
+                            referrerpolicy="no-referrer-when-downgrade">
+                        </iframe>
+                    </div>
+                </div>
+
+                <div>
+                    <h6 class="mb-3" style="color: var(--text-secondary);">Economic Calender</h6>
+                    <div class="tv-widget-root" style="height: 680px;">
+                        <iframe
+                            src="https://html.cafe/x12144ea8"
+                            title="Economic Calendar"
+                            style="width:100%;height:100%;border:0;border-radius:8px;background:#0b1220;"
+                            loading="lazy"
+                            referrerpolicy="no-referrer-when-downgrade">
+                        </iframe>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+>>>>>>> d01e1cd (update)
         <!-- Motivation Section -->
         <div class="row g-4 mb-4">
             <div class="col-12">
@@ -1889,6 +1979,97 @@ try {
             });
         });
         
+<<<<<<< HEAD
+=======
+        // Activate TradingView/Economic widgets sections via hash and keep sidebar item active
+        function loadWidgetForSection(hash) {
+            const targetSection = document.querySelector(hash);
+            if (!targetSection) return;
+
+            const lazyContainers = targetSection.querySelectorAll('.tv-widget-lazy');
+            lazyContainers.forEach((lazyContainer) => {
+                if (lazyContainer.dataset.loaded === '1') return;
+
+                const widgetSrc = lazyContainer.getAttribute('data-widget-src');
+                const configEl = lazyContainer.querySelector('.tv-widget-config');
+                const widgetConfig = configEl ? configEl.textContent.trim() : '{}';
+
+                // Build TradingView widget only when the section is opened for the first time
+                const tvContainer = document.createElement('div');
+                tvContainer.className = 'tradingview-widget-container';
+                tvContainer.style.width = '100%';
+                tvContainer.style.height = '100%';
+
+                const widgetHost = document.createElement('div');
+                widgetHost.className = 'tradingview-widget-container__widget';
+                widgetHost.style.width = '100%';
+                widgetHost.style.height = '100%';
+
+                const script = document.createElement('script');
+                script.type = 'text/javascript';
+                script.src = widgetSrc;
+                script.async = true;
+                script.text = widgetConfig;
+
+                tvContainer.appendChild(widgetHost);
+                tvContainer.appendChild(script);
+
+                lazyContainer.innerHTML = '';
+                lazyContainer.appendChild(tvContainer);
+                lazyContainer.dataset.loaded = '1';
+            });
+        }
+
+        function activateDashboardWidgetSection() {
+            const allowedHashes = ['#live-market', '#economic'];
+            let hash = window.location.hash || '';
+
+            const isAllowedHash = allowedHashes.includes(hash);
+            const dashboardLink = document.querySelector('.sidebar .nav-link.dashboard-link');
+
+            // Reset active state for all sidebar links, then set only the active widget link
+            document.querySelectorAll('.sidebar .nav-link').forEach(link => link.classList.remove('active'));
+
+            document.querySelectorAll('.dashboard-section.section-widget').forEach(section => {
+                section.classList.remove('active');
+            });
+
+            // Default state: keep dashboard active, widgets hidden until sidebar section click
+            if (!isAllowedHash) {
+                if (dashboardLink) dashboardLink.classList.add('active');
+                return;
+            }
+
+            const activeLink = document.querySelector(`.sidebar .nav-link.section-nav[href="${hash}"]`);
+            if (activeLink) activeLink.classList.add('active');
+
+            const targetSection = document.querySelector(hash);
+            if (targetSection) {
+                targetSection.classList.add('active');
+                loadWidgetForSection(hash);
+            }
+        }
+
+        document.addEventListener('DOMContentLoaded', function() {
+            const initialHash = window.location.hash || '';
+            const initialAllowed = ['#live-market', '#economic'].includes(initialHash);
+
+            activateDashboardWidgetSection();
+
+            // If user came with a deep-link hash, scroll into view
+            if (initialAllowed) {
+                const target = document.querySelector(initialHash);
+                if (target) target.scrollIntoView({ behavior: 'smooth', block: 'start' });
+            }
+        });
+
+        window.addEventListener('hashchange', function() {
+            activateDashboardWidgetSection();
+            const target = document.querySelector(window.location.hash);
+            if (target) target.scrollIntoView({ behavior: 'smooth', block: 'start' });
+        });
+        
+>>>>>>> d01e1cd (update)
         
         // Add smooth scroll animations on page load
         document.addEventListener('DOMContentLoaded', function() {

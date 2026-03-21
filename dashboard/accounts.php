@@ -159,6 +159,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['mt5_connect'])) {
     $mt5_account_number = trim($_POST['mt5_account_number'] ?? '');
     $mt5_broker_server  = trim($_POST['mt5_broker_server'] ?? '');
     $mt5_password       = trim($_POST['mt5_investor_password'] ?? '');
+<<<<<<< HEAD
     $mt5_linked_account_id = isset($_POST['mt5_linked_account_id']) ? (int)$_POST['mt5_linked_account_id'] : 0;
     $mt5_sync_method    = trim($_POST['mt5_sync_method'] ?? 'cloud');
     $mt5_cloud_api_key  = trim($_POST['mt5_cloud_api_key'] ?? '');
@@ -187,6 +188,116 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['mt5_connect'])) {
             $mt5_success = "MT5 account सफलतापूर्वक connect भयो (" . ($mt5_sync_method === 'cloud' ? 'Cloud Sync' : 'Local Sync') . ")। Backend बाट trade history sync हुन्छ।";
         } else {
             $mt5_error = "MT5 connect असफल: " . $result['message'];
+=======
+    $mt5_linked_account_id = 0;
+
+    if ($mt5_account_number === '' || $mt5_broker_server === '' || $mt5_password === '') {
+        $mt5_error = "MT5 Account ID, Broker server र Investor password सबै अनिवार्य छन्।";
+    } else {
+        try {
+            // Auto-link by MT5 login/server; if not found, create a dedicated trading account.
+            $columns_check = $pdo->query("SHOW COLUMNS FROM trading_accounts LIKE 'is_demo'")->fetch();
+            if ($columns_check) {
+                $find_account_stmt = $pdo->prepare("
+                    SELECT id
+                    FROM trading_accounts
+                    WHERE user_id = ?
+                      AND is_demo = ?
+                      AND account_number = ?
+                      AND broker_name = ?
+                    ORDER BY id DESC
+                    LIMIT 1
+                ");
+                $find_account_stmt->execute([
+                    $_SESSION['user_id'],
+                    $is_demo ? 1 : 0,
+                    $mt5_account_number,
+                    $mt5_broker_server,
+                ]);
+            } else {
+                $find_account_stmt = $pdo->prepare("
+                    SELECT id
+                    FROM trading_accounts
+                    WHERE user_id = ?
+                      AND account_number = ?
+                      AND broker_name = ?
+                    ORDER BY id DESC
+                    LIMIT 1
+                ");
+                $find_account_stmt->execute([
+                    $_SESSION['user_id'],
+                    $mt5_account_number,
+                    $mt5_broker_server,
+                ]);
+            }
+
+            $existing_account = $find_account_stmt->fetch(PDO::FETCH_ASSOC);
+            if ($existing_account) {
+                $mt5_linked_account_id = (int)$existing_account['id'];
+            } else {
+                if ($columns_check) {
+                    $create_account_stmt = $pdo->prepare("
+                        INSERT INTO trading_accounts
+                            (user_id, is_demo, account_name, account_type, broker_name, account_number, initial_balance, current_balance, currency, leverage, notes)
+                        VALUES
+                            (:user_id, :is_demo, :account_name, :account_type, :broker_name, :account_number, :initial_balance, :current_balance, :currency, :leverage, :notes)
+                    ");
+                    $create_account_stmt->execute([
+                        ':user_id'         => $_SESSION['user_id'],
+                        ':is_demo'         => $is_demo ? 1 : 0,
+                        ':account_name'    => 'MT5 ' . $mt5_account_number,
+                        ':account_type'    => 'forex',
+                        ':broker_name'     => $mt5_broker_server,
+                        ':account_number'  => $mt5_account_number,
+                        ':initial_balance' => 0,
+                        ':current_balance' => 0,
+                        ':currency'        => 'USD',
+                        ':leverage'        => '',
+                        ':notes'           => 'Auto-created while connecting MT5 account.',
+                    ]);
+                } else {
+                    $create_account_stmt = $pdo->prepare("
+                        INSERT INTO trading_accounts
+                            (user_id, account_name, account_type, broker_name, account_number, initial_balance, current_balance, currency, leverage, notes)
+                        VALUES
+                            (:user_id, :account_name, :account_type, :broker_name, :account_number, :initial_balance, :current_balance, :currency, :leverage, :notes)
+                    ");
+                    $create_account_stmt->execute([
+                        ':user_id'         => $_SESSION['user_id'],
+                        ':account_name'    => 'MT5 ' . $mt5_account_number,
+                        ':account_type'    => 'forex',
+                        ':broker_name'     => $mt5_broker_server,
+                        ':account_number'  => $mt5_account_number,
+                        ':initial_balance' => 0,
+                        ':current_balance' => 0,
+                        ':currency'        => 'USD',
+                        ':leverage'        => '',
+                        ':notes'           => 'Auto-created while connecting MT5 account.',
+                    ]);
+                }
+                $mt5_linked_account_id = (int)$pdo->lastInsertId();
+            }
+        } catch (PDOException $e) {
+            $mt5_error = "MT5 link account create/find असफल: " . $e->getMessage();
+        }
+
+        if (!$mt5_error) {
+            $jwtToken = null;
+            $result = mt5_connect_account(
+                $MT5_API_BASE,
+                $mt5_account_number,
+                $mt5_broker_server,
+                $mt5_password,
+                $mt5_linked_account_id,
+                (int)$_SESSION['user_id'],
+                $jwtToken
+            );
+            if ($result['success']) {
+                $mt5_success = "MT5 account सफलतापूर्वक connect भयो। Backend बाट trade history sync हुन्छ।";
+            } else {
+                $mt5_error = "MT5 connect असफल: " . $result['message'];
+            }
+>>>>>>> d01e1cd (update)
         }
     }
 }
@@ -583,8 +694,12 @@ try {
                         </h4>
                         <p class="mb-0" style="color: var(--text-secondary) !important;">
                             यहाँबाट तपाईँले आफ्नो MetaTrader 5 account लाई investor (read‑only) password प्रयोग गरेर connect गर्न सक्नुहुन्छ।
+<<<<<<< HEAD
                             <strong>Cloud Sync:</strong> MT5 terminal install नगरीकनै server बाट सीधै sync गर्न सकिन्छ (MT Connect API वा broker REST API)।
                             <strong>Local Sync:</strong> तपाईंको laptop मा MT5 terminal चाहिन्छ।
+=======
+                            Login, Server र Investor Password मात्र हालेर connect गर्न मिल्छ।
+>>>>>>> d01e1cd (update)
                         </p>
                     </div>
                 </div>
@@ -604,6 +719,7 @@ try {
                 <?php endif; ?>
 
                 <form method="post" class="row g-3">
+<<<<<<< HEAD
                     <div class="col-12">
                         <label class="form-label">Sync Method *</label>
                         <select name="mt5_sync_method" id="mt5_sync_method" class="form-select" required onchange="toggleCloudFields()">
@@ -615,6 +731,8 @@ try {
                         </small>
                     </div>
                     
+=======
+>>>>>>> d01e1cd (update)
                     <div class="col-md-4">
                         <label class="form-label">MT5 Account ID *</label>
                         <input type="text" name="mt5_account_number" class="form-control" required placeholder="जस्तै: 12345678">
@@ -639,6 +757,7 @@ try {
                             * यो password backend मा मात्र encrypt भएर रहन्छ, वेबसाइटले कहिल्यै plain text मा देखाउँदैन।
                         </small>
                     </div>
+<<<<<<< HEAD
                     
                     <!-- Cloud API fields (shown only when cloud sync selected) -->
                     <div class="col-md-6" id="cloud_api_key_field" style="display: none;">
@@ -675,6 +794,8 @@ try {
                             </div>
                         <?php endif; ?>
                     </div>
+=======
+>>>>>>> d01e1cd (update)
                     <div class="col-12 mt-2">
                         <input type="hidden" name="mt5_connect" value="1">
                         <button type="submit" class="btn btn-primary">
@@ -736,9 +857,16 @@ try {
                                     </td>
                                     <td>
                                         <button 
+<<<<<<< HEAD
                                             class="btn btn-sm btn-primary sync-btn" 
                                             data-mt5-id="<?php echo (int)$mt5['id']; ?>"
                                             onclick="syncMT5Account(<?php echo (int)$mt5['id']; ?>)"
+=======
+                                            type="button"
+                                            class="btn btn-sm btn-primary sync-btn" 
+                                            data-mt5-id="<?php echo (int)$mt5['id']; ?>"
+                                            onclick="syncMT5Account(event, <?php echo (int)$mt5['id']; ?>)"
+>>>>>>> d01e1cd (update)
                                         >
                                             <i class="fas fa-sync-alt"></i> Sync Now
                                         </button>
@@ -755,6 +883,7 @@ try {
 
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
     <script>
+<<<<<<< HEAD
         function toggleCloudFields() {
             const method = document.getElementById('mt5_sync_method').value;
             const apiKeyField = document.getElementById('cloud_api_key_field');
@@ -775,6 +904,13 @@ try {
         });
         
         function syncMT5Account(mt5Id) {
+=======
+        function syncMT5Account(event, mt5Id) {
+            if (event) {
+                event.preventDefault();
+                event.stopPropagation();
+            }
+>>>>>>> d01e1cd (update)
             const btn = document.querySelector(`button[data-mt5-id="${mt5Id}"]`);
             const originalHtml = btn.innerHTML;
             btn.disabled = true;
